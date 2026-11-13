@@ -11,6 +11,8 @@
   --danger: #ff5a5f;
   --genre: #1ed760;          /* couleur du genre en cours (mise à jour par le JS) */
   --ticker-h: 76px;
+  --header-h: 69px;
+  --stage-h: calc(100dvh - var(--header-h) - var(--ticker-h));
   --ease-pop: cubic-bezier(.2, 1.4, .4, 1);
 }
 * { box-sizing: border-box; }
@@ -180,7 +182,7 @@ select option { background: var(--panel-solid); }
 .spinning .wheel-wrap::before { opacity: .75; animation-duration: 2s; }
 #wheel { width: 100%; height: 100%; display: block; filter: drop-shadow(0 24px 40px rgba(0,0,0,.55)); }
 .pointer {
-  position: absolute; top: -10px; left: 50%; z-index: 2; width: 40px; height: 48px; transform: translateX(-50%); transform-origin: 50% 20%;
+  position: absolute; top: -1.8%; left: 50%; z-index: 2; width: 7.4%; height: 8.9%; transform: translateX(-50%); transform-origin: 50% 20%;
   background: linear-gradient(180deg, #fff, #d9d9e0);
   clip-path: polygon(50% 100%, 0 0, 100% 0);
   filter: drop-shadow(0 4px 6px rgba(0,0,0,.6));
@@ -301,13 +303,13 @@ kbd { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15)
 .lyrics-track .title { font-weight: 700; font-size: .95rem; }
 .lyrics-track .artist { color: var(--muted); font-size: .82rem; }
 .lyrics {
-  position: relative; flex: 1; overflow-y: auto; padding: 24px 6px 40vh 0; scroll-behavior: smooth;
+  position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 14px 40vh 0; scroll-behavior: smooth;
   -webkit-mask-image: linear-gradient(transparent, #000 8%, #000 85%, transparent); mask-image: linear-gradient(transparent, #000 8%, #000 85%, transparent);
 }
 .lyrics p { margin: 0 0 12px; line-height: 1.45; }
 .lyrics .line { color: rgba(255,255,255,.32); font-weight: 700; font-size: 1.08rem; transition: color .3s, transform .3s, filter .3s; transform-origin: left; filter: blur(.4px); }
 .lyrics .line.past { color: rgba(255,255,255,.5); filter: none; }
-.lyrics .line.active { color: #fff; transform: scale(1.06); filter: none; text-shadow: 0 0 22px color-mix(in srgb, var(--genre) 60%, transparent); }
+.lyrics .line.active { color: #fff; transform: scale(1.03); filter: none; text-shadow: 0 0 22px color-mix(in srgb, var(--genre) 60%, transparent); }
 .lyrics .plain { color: var(--text); white-space: pre-wrap; font-size: .95rem; }
 .lyrics-empty { color: var(--muted); font-style: italic; }
 
@@ -444,7 +446,7 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 #viz { position: absolute; inset: -11%; width: 122%; height: 122%; z-index: 0; pointer-events: none; }
 #wheel { position: relative; z-index: 1; }
 .pointer { z-index: 3; }
-.wheel-wrap { transition: transform .8s var(--ease-pop); }
+.wheel-wrap { transition: transform .8s var(--ease-pop), width .9s var(--ease-pop); }
 .spinning .wheel-wrap { transform: scale(1.05); }
 .spinning .pointer { animation: none; }
 .pointer.flick { animation: flick .14s ease-out; }
@@ -555,3 +557,54 @@ body.troll #trollInfo { opacity: 1; transform: none; }
   .qr-card { flex-direction: row; text-align: left; }
   .qr { width: 200px; }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Mise en page « scène » : tout tient dans l'écran, roue centrée     */
+/* ------------------------------------------------------------------ */
+@media (min-width: 1221px) {
+  main {
+    height: var(--stage-h); min-height: 600px; padding: 22px 28px; align-items: stretch;
+    grid-template-columns: clamp(300px, 22vw, 380px) minmax(0, 1fr) clamp(320px, 22vw, 380px);
+    max-width: 1800px;
+  }
+  .left-col { position: static; height: 100%; min-height: 0; }
+  .side { height: 100%; min-height: 0; overflow-y: auto; padding: 2px 6px 2px 2px; margin-right: -6px; }
+  .side .card { flex: none; }
+  .wheel-zone { height: 100%; min-height: 0; justify-content: center; gap: 16px; }
+  .wheel-zone > * { flex: none; }
+  /* la roue prend toute la hauteur disponible… */
+  .wheel-wrap { width: min(100%, calc(var(--stage-h) - 200px), 760px); }
+  /* …et se fait plus petite quand un genre joue, pour laisser la place à la carte */
+  body.live .wheel-wrap, .wheel-zone:has(#result:not([hidden])) .wheel-wrap { width: min(100%, calc(var(--stage-h) - 345px), 640px); }
+  .wheel-zone:has(#result:not([hidden])) .kbd-hint { display: none; }
+  /* carte du genre compacte : genre + chrono côte à côte, morceau + boutons sur une ligne */
+  #result {
+    width: min(660px, 100%); padding: 16px 22px; text-align: left;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-items: center;
+    grid-template-areas: "label timer" "name timer" "pl timer" "prog prog" "now ctrl";
+    grid-template-rows: auto 2.6rem auto auto auto;
+  }
+  #result .genre-label { grid-area: label; }
+  #result .genre-name { grid-area: name; font-size: 2.1rem; margin: 0; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #result .timer { grid-area: timer; font-size: 3.4rem; margin: 0; line-height: 1; }
+  #result .progress { grid-area: prog; margin: 12px 0 12px; }
+  #result .playlist { grid-area: pl; margin: 6px 0 0; font-size: .8rem; min-width: 0; }
+  #result .playlist a { padding: 3px 10px; max-width: 100%; }
+  #result .playlist span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #result .now { grid-area: now; justify-content: flex-start; margin: 0; min-height: 0; min-width: 0; }
+  #result .now .meta { min-width: 0; }
+  #result .now .title, #result .now .artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #result .controls { grid-area: ctrl; justify-content: flex-end; flex-wrap: nowrap; gap: 8px; }
+  #result .controls button.round { width: 42px; height: 42px; }
+  #result .controls button.round.play { width: 50px; height: 50px; }
+  #result .controls #stopBtn { padding: 10px 14px; }
+  .qr { max-width: min(270px, 27vh); }
+}
+
+/* barre de défilement des paroles masquée (le défilement est automatique) */
+.lyrics { scrollbar-width: none; }
+.lyrics::-webkit-scrollbar { display: none; }
+/* barres de défilement discrètes ailleurs */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
