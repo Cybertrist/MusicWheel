@@ -56,7 +56,8 @@ async function sha256base64url(text) {
 }
 
 async function login() {
-  const clientId = $('clientId').value.trim();
+  const clientId = $('clientId').value.trim() || DEFAULT_CLIENT_ID;
+  $('clientId').value = clientId;
   if (!clientId) { say('Colle d\'abord ton Spotify Client ID dans les réglages.', true); return; }
   store.set('mw_client_id', clientId);
   const verifier = randomString(64);
