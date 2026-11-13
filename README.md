@@ -27,6 +27,7 @@ et Spotify joue des morceaux de ce genre pendant 15 minutes (durée réglable). 
   (immédiatement si rien ne joue, sinon au prochain tirage de la roue, puis la roue tourne toute seule).
 - Chat en direct : scanne le QR code affiché à l'écran (ou ouvre la page avec `?chat`) pour écrire depuis ton téléphone.
   Les messages passent dans le bandeau du bas et en bulles, façon télé. Relais : [ntfy.sh](https://ntfy.sh), sans compte.
+- Modération : la page `?admin` permet de supprimer un message ou de vider tout le chat sur tous les écrans.
 - Les paroles du morceau en cours s'affichent à gauche (synchronisées quand c'est possible), via [LRCLIB](https://lrclib.net).
 
 ## Comment ça marche

@@ -1556,6 +1556,7 @@ const cleanText = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, 
 function makeBubble(msg) {
   const el = document.createElement('div');
   el.className = 'bubble' + (msg.id === chatId ? ' mine' : '');
+  if (msg.eid) el.dataset.eid = msg.eid;
   const hue = hueOf(msg.n);
   const av = document.createElement('div');
   av.className = 'av';
@@ -1571,14 +1572,63 @@ function makeBubble(msg) {
   txt.textContent = msg.m;
   body.append(who, txt);
   el.append(av, body);
+  if (adminMode && msg.eid) {
+    if (msg.time) {
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = new Date(msg.time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      who.appendChild(time);
+    }
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.type = 'button';
+    del.title = 'Supprimer ce message';
+    del.innerHTML = '<svg class="i"><use href="#i-x"/></svg>';
+    del.onclick = () => sendControl({ t: 'del', e: msg.eid });
+    el.appendChild(del);
+  }
   return el;
+}
+
+// ---- Modération : commandes envoyées sur le même canal que le chat
+const EMPTY_TICKER = 'Scanne le QR code et écris un message, il passera ici en direct.';
+const EMPTY_LOG = $('chatLog').innerHTML;
+
+function clearChatLocal() {
+  chatFeed.length = 0;
+  renderTicker();
+  $('bubbles').innerHTML = '';
+  $('chatLog').innerHTML = EMPTY_LOG;
+}
+
+function deleteChatLocal(eid) {
+  const i = chatFeed.findIndex((m) => m.eid === eid);
+  if (i >= 0) { chatFeed.splice(i, 1); renderTicker(); }
+  document.querySelectorAll(`.bubble[data-eid="${CSS.escape(eid)}"]`).forEach((el) => el.remove());
+  if (!$('chatLog').querySelector('.bubble')) $('chatLog').innerHTML = EMPTY_LOG;
+}
+
+async function sendControl(cmd) {
+  try {
+    const res = await fetch(CHAT_URL, { method: 'POST', body: JSON.stringify(cmd) });
+    if (!res.ok) throw new Error(res.status);
+    toast(cmd.t === 'clear' ? 'Chat vidé sur tous les écrans.' : 'Message supprimé.');
+  } catch {
+    toast('Action impossible pour le moment, réessaie.');
+  }
 }
 
 function renderTicker() {
   const move = $('tickerMove');
   move.classList.remove('run');
   move.innerHTML = '';
-  if (!chatFeed.length) return;
+  if (!chatFeed.length) {
+    const empty = document.createElement('span');
+    empty.className = 'ticker-empty';
+    empty.textContent = EMPTY_TICKER;
+    move.appendChild(empty);
+    return;
+  }
   const items = [...chatFeed].reverse();
   // contenu doublé pour une boucle sans à-coup
   for (let k = 0; k < 2; k++) {
@@ -1634,10 +1684,12 @@ function connectChat() {
     if (ev.event !== 'message' || chatSeen.has(ev.id)) return;
     chatSeen.add(ev.id);
     try { msg = JSON.parse(ev.message); } catch { return; }
+    if (msg.t === 'clear') { clearChatLocal(); return; }
+    if (msg.t === 'del') { deleteChatLocal(String(msg.e || '')); return; }
     const n = cleanText(msg.n, 20) || 'Anonyme';
     const m = cleanText(msg.m, 140);
     if (!m) return;
-    onChatMessage({ n, m, id: msg.id }, ev.time * 1000 >= chatConnectedAt - 5000);
+    onChatMessage({ n, m, id: msg.id, eid: ev.id, time: ev.time * 1000 }, ev.time * 1000 >= chatConnectedAt - 5000);
   };
   // EventSource se reconnecte tout seul ; les doublons sont filtrés par chatSeen
 }
@@ -1662,7 +1714,7 @@ async function sendChat(form) {
 }
 
 function initChat() {
-  for (const form of [$('chatFormHost'), $('chatFormPhone')]) {
+  for (const form of [$('chatFormPhone')]) {
     form.elements.nick.value = store.get('mw_chat_nick', '');
     form.onsubmit = (e) => { e.preventDefault(); sendChat(form); };
   }
@@ -1670,9 +1722,9 @@ function initChat() {
     // En local (127.0.0.1) les téléphones ne peuvent pas joindre le PC : on pointe vers la version en ligne
     const isLocal = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
     const url = (isLocal ? PUBLIC_URL : location.origin + location.pathname) + '?chat';
-    $('qrLink').href = url;
+    $('qrDock').href = url;
     if (window.QRCode) {
-      new QRCode($('qrLink'), { text: url, width: 200, height: 200, colorDark: '#0c0c10', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      new QRCode($('qrLink'), { text: url, width: 256, height: 256, colorDark: '#0c0c10', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
     }
     $('showChat').checked = store.get('mw_show_chat', true);
     document.body.classList.toggle('hide-chat', !$('showChat').checked);
@@ -1681,10 +1733,26 @@ function initChat() {
       document.body.classList.toggle('hide-chat', !e.target.checked);
     };
   }
+  // bouton « Vider tout le chat » (page de modération) : il faut cliquer deux fois
+  let confirmTimer = 0;
+  $('clearChat').onclick = (e) => {
+    const btn = e.currentTarget;
+    if (!btn.classList.contains('confirm')) {
+      btn.classList.add('confirm');
+      btn.lastChild.textContent = ' Sûr ? Clique encore';
+      confirmTimer = setTimeout(() => { btn.classList.remove('confirm'); btn.lastChild.textContent = ' Vider tout le chat'; }, 4000);
+      return;
+    }
+    clearTimeout(confirmTimer);
+    btn.classList.remove('confirm');
+    btn.lastChild.textContent = ' Vider tout le chat';
+    sendControl({ t: 'clear' });
+  };
   connectChat();
 }
 
 const chatMode = document.documentElement.classList.contains('chat-mode');
+const adminMode = document.documentElement.classList.contains('admin-mode');
 
 (async () => {
   initChat();

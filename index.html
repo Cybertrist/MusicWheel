@@ -8,8 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
-  <script>if (new URLSearchParams(location.search).has('chat')) document.documentElement.classList.add('chat-mode');</script>
+  <link rel="stylesheet" href="style.css?v=14">
+  <script>
+    (() => {
+      const q = new URLSearchParams(location.search), cl = document.documentElement.classList;
+      if (q.has('chat') || q.has('admin')) cl.add('chat-mode');
+      if (q.has('admin')) cl.add('admin-mode');
+    })();
+  </script>
 </head>
 <body>
   <!-- Icônes (sprite SVG) -->
@@ -74,13 +80,24 @@
     </header>
 
     <main>
-      <section class="lyrics-panel card">
-        <h2><svg class="i"><use href="#i-mic"/></svg> Paroles</h2>
-        <div class="lyrics-track" id="lyricsTrack"></div>
-        <div class="lyrics" id="lyrics">
-          <p class="lyrics-empty">Les paroles du morceau en cours s'afficheront ici.</p>
-        </div>
-      </section>
+      <div class="left-col">
+        <section class="lyrics-panel card">
+          <h2><svg class="i"><use href="#i-mic"/></svg> Paroles</h2>
+          <div class="lyrics-track" id="lyricsTrack"></div>
+          <div class="lyrics" id="lyrics">
+            <p class="lyrics-empty">Les paroles du morceau en cours s'afficheront ici.</p>
+          </div>
+        </section>
+
+        <!-- QR code bien visible -->
+        <a id="qrDock" class="qr-card card" target="_blank" title="Ouvrir le chat">
+          <div class="qr" id="qrLink"></div>
+          <div class="qr-text">
+            <strong>Écris sur l'écran !</strong>
+            <span>Scanne, choisis un pseudo, envoie. Tape <b>!troll</b> pour un fond troll.</span>
+          </div>
+        </a>
+      </div>
 
       <section class="wheel-zone">
         <div class="wheel-wrap">
@@ -127,26 +144,6 @@
         </div>
 
         <div class="card">
-          <h2><svg class="i"><use href="#i-chat"/></svg> Chat en direct</h2>
-          <div class="qr-row">
-            <a id="qrLink" class="qr" target="_blank" title="Ouvrir le chat"></a>
-            <p>Scanne le QR code avec ton téléphone pour écrire sur l'écran.</p>
-          </div>
-          <form class="chat-form" id="chatFormHost" autocomplete="off">
-            <input name="nick" maxlength="20" placeholder="Pseudo">
-            <div class="chat-input">
-              <input name="msg" maxlength="140" placeholder="Écrire un message…">
-              <button type="submit" class="icon-btn" title="Envoyer"><svg class="i"><use href="#i-send"/></svg></button>
-            </div>
-          </form>
-          <label class="switch">
-            <input id="showChat" type="checkbox" checked><span class="slider"></span>
-            <span>Afficher les messages à l'écran</span>
-          </label>
-          <p class="hint">Astuce : écrire <kbd>!troll</kbd> dans le chat lance un fond troll.</p>
-        </div>
-
-        <div class="card">
           <h2><svg class="i"><use href="#i-sliders"/></svg> Réglages</h2>
           <div class="field">
             <span class="field-label">Durée d'une session</span>
@@ -173,6 +170,10 @@
             <span>Effets sonores</span>
           </label>
           <label class="switch">
+            <input id="showChat" type="checkbox" checked><span class="slider"></span>
+            <span>Afficher le chat à l'écran</span>
+          </label>
+          <label class="switch">
             <input id="trollMode" type="checkbox" checked><span class="slider"></span>
             <span>Fonds troll de temps en temps</span>
           </label>
@@ -180,7 +181,10 @@
             <span class="field-label">Tes GIFs troll (un lien par ligne, optionnel)</span>
             <textarea id="trollGifs" rows="3" spellcheck="false" placeholder="https://media.giphy.com/media/…/giphy.gif"></textarea>
           </div>
-          <button id="trollBtn" class="ghost small" type="button">Lancer un troll maintenant</button>
+          <div class="row settings-actions">
+            <button id="trollBtn" class="ghost small" type="button">Lancer un troll maintenant</button>
+            <a class="ghost-link" href="?admin" target="_blank">Modérer le chat</a>
+          </div>
         </div>
 
         <div class="card">
@@ -204,8 +208,13 @@
   <div class="phone">
     <header class="phone-head">
       <h1><svg class="i logo"><use href="#i-wheel"/></svg> Music <em>Wheel</em></h1>
-      <span class="onair on">Chat live</span>
+      <span class="onair on only-chat">Chat live</span>
+      <span class="onair only-admin">Modération</span>
     </header>
+    <div class="admin-bar only-admin">
+      <p>Clique sur la croix d'un message pour le retirer de tous les écrans, ou vide tout le chat d'un coup.</p>
+      <button id="clearChat" class="danger-btn" type="button"><svg class="i"><use href="#i-x"/></svg> Vider tout le chat</button>
+    </div>
     <div class="chat-log" id="chatLog">
       <p class="lyrics-empty">Les messages envoyés ici s'affichent en direct sur l'écran. Écris <b>!troll</b> pour lancer un fond troll.</p>
     </div>
@@ -220,7 +229,7 @@
 
   <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=14"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
