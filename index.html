@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music Wheel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🎡 Music Wheel</h1>
+    <div id="auth">
+      <span id="authStatus">Non connecté à Spotify</span>
+      <button id="loginBtn">Se connecter à Spotify</button>
+      <button id="logoutBtn" class="ghost" hidden>Déconnexion</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="wheel-zone">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="520" height="520"></canvas>
+      </div>
+      <button id="spinBtn" class="big">Tourner la roue</button>
+      <div id="result" hidden>
+        <div class="genre-label">Genre tiré : <strong id="resultGenre"></strong></div>
+        <div class="timer" id="timer">15:00</div>
+        <div class="playlist" id="playlistInfo"></div>
+        <div class="now" id="nowPlaying"></div>
+        <div class="controls">
+          <button id="prevBtn" class="ghost">⏮</button>
+          <button id="pauseBtn" class="ghost">⏯</button>
+          <button id="nextBtn" class="ghost">⏭</button>
+          <button id="stopBtn" class="ghost">Arrêter la session</button>
+        </div>
+      </div>
+      <div id="message"></div>
+    </section>
+
+    <aside>
+      <h2>Genres sur la roue</h2>
+      <form id="addForm">
+        <input id="genreInput" placeholder="Ajouter un genre (ex : Jazz)" autocomplete="off">
+        <button type="submit">+</button>
+      </form>
+      <ul id="genreList"></ul>
+      <button id="resetGenres" class="ghost small">Remettre les genres par défaut</button>
+
+      <h2>Réglages</h2>
+      <label>Durée d'une session (minutes)
+        <input id="duration" type="number" min="1" max="180" value="15">
+      </label>
+      <label class="check"><input id="autoSpin" type="checkbox"> Relancer la roue automatiquement à la fin</label>
+      <label>Appareil de lecture
+        <select id="deviceSelect"><option value="">— connecte-toi d'abord —</option></select>
+      </label>
+      <button id="refreshDevices" class="ghost small">Rafraîchir les appareils</button>
+      <label>Spotify Client ID
+        <input id="clientId" placeholder="Colle ici le Client ID de ton app Spotify">
+      </label>
+      <p class="hint">Redirect URI à déclarer dans le dashboard Spotify :<br><code id="redirectHint"></code></p>
+    </aside>
+  </main>
+
+  <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
+  <script src="app.js"></script>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+</body>
+</html>
