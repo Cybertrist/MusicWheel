@@ -56,9 +56,7 @@ async function sha256base64url(text) {
 }
 
 async function login() {
-  const clientId = $('clientId').value.trim() || DEFAULT_CLIENT_ID;
-  $('clientId').value = clientId;
-  if (!clientId) { say('Colle d\'abord ton Spotify Client ID dans les réglages.', true); return; }
+  const clientId = DEFAULT_CLIENT_ID;
   store.set('mw_client_id', clientId);
   const verifier = randomString(64);
   store.set('mw_verifier', verifier);
@@ -185,7 +183,10 @@ function initPlayer() {
   player.addListener('account_error', () => say('Le lecteur navigateur nécessite un compte Spotify Premium. Tu peux choisir un autre appareil (ex : l\'appli Spotify ouverte).', true));
   player.addListener('authentication_error', ({ message }) => say('Erreur d\'auth du lecteur : ' + message, true));
   player.addListener('initialization_error', ({ message }) => say('Lecteur navigateur indisponible : ' + message, true));
-  player.addListener('player_state_changed', () => updateNowPlaying());
+  player.addListener('player_state_changed', (st) => {
+    if (st) playback = { progress: st.position, at: Date.now(), playing: !st.paused };
+    updateNowPlaying();
+  });
   player.connect();
 }
 
@@ -347,9 +348,11 @@ async function startSession(entry) {
     genre: entry,
     deviceId,
     endAt: Date.now() + targetMs,
+    total: targetMs,
     interval: setInterval(tick, 500),
-    poll: setInterval(updateNowPlaying, 8000),
+    poll: setInterval(updateNowPlaying, 4000),
   };
+  $('result').classList.add('live');
   tick();
   setTimeout(updateNowPlaying, 1500);
 }
@@ -358,10 +361,16 @@ function tick() {
   if (!session) return;
   const left = session.endAt - Date.now();
   $('timer').textContent = fmt(Math.max(0, left));
+  $('progressBar').style.width = `${Math.max(0, Math.min(1, left / session.total)) * 100}%`;
+  $('result').classList.toggle('final', left > 0 && left <= 10_000);
   if (left <= 0) {
     stopSession(true);
-    say('⏰ Session terminée ! Relance la roue pour un nouveau genre.');
-    if ($('autoSpin').checked) setTimeout(spin, 1500);
+    $('result').classList.remove('final');
+    const auto = $('autoSpin').checked;
+    celebrate(auto);
+    say(auto ? '⏰ Session terminée ! La roue repart…' : '⏰ Session terminée ! Relance la roue pour un nouveau genre.');
+    if (updatePending) setTimeout(() => applyUpdate(auto), 3300);
+    else if (auto) setTimeout(spin, 3300);
   }
 }
 
@@ -370,8 +379,12 @@ function stopSession(pause = true) {
   clearInterval(session.interval);
   clearInterval(session.poll);
   if (pause) api(`/me/player/pause?device_id=${encodeURIComponent(session.deviceId)}`, { method: 'PUT' }).catch(() => {});
+  const played = session.genre;
   session = null;
   $('timer').textContent = '00:00';
+  $('progressBar').style.width = '0%';
+  $('result').classList.remove('live');
+  markPlayed(played);
 }
 
 async function updateNowPlaying() {
@@ -382,8 +395,93 @@ async function updateNowPlaying() {
     $('nowPlaying').textContent = item
       ? `${state.is_playing ? '▶' : '⏸'} ${item.name} — ${item.artists.map((a) => a.name).join(', ')}`
       : '';
+    playback = { progress: state?.progress_ms || 0, at: Date.now(), playing: !!state?.is_playing };
+    if (item && item.id !== lyrics.trackId) loadLyrics(item);
   } catch { /* silencieux */ }
 }
+
+// ---------------------------------------------------------------------
+//  Paroles (LRCLIB — gratuit, sans clé, paroles synchronisées)
+// ---------------------------------------------------------------------
+let lyrics = { trackId: null, lines: [], active: -1 };
+let playback = { progress: 0, at: 0, playing: false };
+
+function parseLrc(lrc) {
+  const lines = [];
+  for (const raw of lrc.split(/\r?\n/)) {
+    const stamps = [...raw.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if (!stamps.length) continue;
+    const text = raw.replace(/\[[^\]]*\]/g, '').trim();
+    for (const m of stamps) lines.push({ t: (Number(m[1]) * 60 + Number(m[2])) * 1000, text });
+  }
+  return lines.sort((a, b) => a.t - b.t);
+}
+
+async function fetchLyrics(item) {
+  const artist = item.artists?.[0]?.name || '';
+  const base = 'https://lrclib.net/api/';
+  try {
+    const res = await fetch(base + 'get?' + new URLSearchParams({
+      track_name: item.name, artist_name: artist,
+      album_name: item.album?.name || '', duration: Math.round(item.duration_ms / 1000),
+    }));
+    if (res.ok) return await res.json();
+  } catch { /* on tente la recherche */ }
+  // Repli : recherche plus souple (titre sans "- Remastered", "(feat. ...)", etc.)
+  const title = item.name.replace(/\s*[-(\[].*$/, '').trim() || item.name;
+  const res = await fetch(base + 'search?' + new URLSearchParams({ track_name: title, artist_name: artist }));
+  if (!res.ok) return null;
+  const list = await res.json();
+  return list.find((r) => r.syncedLyrics) || list.find((r) => r.plainLyrics || r.instrumental) || null;
+}
+
+async function loadLyrics(item) {
+  lyrics = { trackId: item.id, lines: [], active: -1 };
+  const box = $('lyrics');
+  $('lyricsTrack').textContent = `${item.name} — ${item.artists.map((a) => a.name).join(', ')}`;
+  box.innerHTML = '<p class="lyrics-empty">Recherche des paroles…</p>';
+  box.scrollTop = 0;
+  let data = null;
+  try { data = await fetchLyrics(item); } catch { /* affiché ci-dessous */ }
+  if (lyrics.trackId !== item.id) return; // le morceau a changé entre-temps
+
+  box.innerHTML = '';
+  const empty = (msg) => { box.innerHTML = `<p class="lyrics-empty">${msg}</p>`; };
+  if (!data) return empty('Paroles introuvables pour ce morceau.');
+  if (data.instrumental) return empty('🎼 Morceau instrumental.');
+  if (data.syncedLyrics) {
+    lyrics.lines = parseLrc(data.syncedLyrics);
+    for (const l of lyrics.lines) {
+      const p = document.createElement('p');
+      p.className = 'line';
+      p.textContent = l.text || '♪';
+      box.appendChild(p);
+    }
+    syncLyrics();
+  } else if (data.plainLyrics) {
+    const p = document.createElement('p');
+    p.className = 'plain';
+    p.textContent = data.plainLyrics;
+    box.appendChild(p);
+  } else empty('Paroles introuvables pour ce morceau.');
+}
+
+function syncLyrics() {
+  if (!lyrics.lines.length) return;
+  const pos = playback.progress + (playback.playing ? Date.now() - playback.at : 0) + 250;
+  let i = -1;
+  while (i + 1 < lyrics.lines.length && lyrics.lines[i + 1].t <= pos) i++;
+  if (i === lyrics.active) return;
+  lyrics.active = i;
+  const box = $('lyrics');
+  [...box.children].forEach((el, k) => {
+    el.classList.toggle('active', k === i);
+    el.classList.toggle('past', k < i);
+  });
+  const el = box.children[Math.max(0, i)];
+  if (el) box.scrollTop = el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2;
+}
+setInterval(syncLyrics, 250);
 
 async function control(action) {
   if (!session) return;
@@ -404,6 +502,88 @@ async function control(action) {
   } catch (e) { say(e.message, true); }
 }
 
+// ---------------------------------------------------------------------
+//  Explosion de fin de chrono (feu d'artifice + confettis plein écran)
+// ---------------------------------------------------------------------
+function celebrate(autoNext) {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const boom = $('boom');
+  boom.querySelector('small').textContent = autoNext ? 'Nouveau genre dans un instant…' : 'Relance la roue pour continuer !';
+  boom.classList.remove('show'); void boom.offsetWidth; boom.classList.add('show');
+  document.body.classList.add('flash', 'shake');
+  setTimeout(() => document.body.classList.remove('flash', 'shake'), 600);
+  setTimeout(() => boom.classList.remove('show'), 3300);
+  if (reduce) return;
+
+  const cv = $('fx');
+  const c = cv.getContext('2d');
+  const r = Math.min(window.devicePixelRatio || 1, 2);
+  const W = innerWidth, H = innerHeight;
+  cv.width = W * r; cv.height = H * r;
+  c.setTransform(r, 0, 0, r, 0, 0);
+
+  const COLORS = ['#1ed760', '#7c5cff', '#ff4fa3', '#ffd23f', '#3fd5ff', '#ffffff', '#ff7a3d'];
+  const pick = () => COLORS[Math.floor(Math.random() * COLORS.length)];
+  const parts = [];
+  const rings = [];
+
+  const burst = (x, y, n, power, kind = 'spark') => {
+    rings.push({ x, y, rad: 0, life: 1, color: pick() });
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = power * (0.35 + Math.random() * 0.65);
+      parts.push({
+        x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - (kind === 'confetti' ? 4 : 0),
+        life: 1, decay: 0.006 + Math.random() * 0.012, color: pick(), kind,
+        size: kind === 'confetti' ? 6 + Math.random() * 6 : 2 + Math.random() * 2.5,
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4,
+      });
+    }
+  };
+
+  // grosse explosion au centre, puis des feux d'artifice autour
+  burst(W / 2, H / 2, 220, 16, 'spark');
+  burst(W / 2, H / 2, 140, 13, 'confetti');
+  const timers = [250, 550, 850, 1150, 1500, 1850].map((d) => setTimeout(() => {
+    burst(W * (0.15 + Math.random() * 0.7), H * (0.15 + Math.random() * 0.5), 90, 9, Math.random() < 0.5 ? 'spark' : 'confetti');
+  }, d));
+
+  const t0 = performance.now();
+  const frame = (now) => {
+    c.clearRect(0, 0, W, H);
+    c.globalCompositeOperation = 'lighter';
+    for (const g of rings) {
+      g.rad += 14; g.life -= 0.03;
+      if (g.life <= 0) continue;
+      c.beginPath(); c.arc(g.x, g.y, g.rad, 0, Math.PI * 2);
+      c.strokeStyle = g.color; c.globalAlpha = g.life * 0.6; c.lineWidth = 4 * g.life + 1; c.stroke();
+    }
+    for (const p of parts) {
+      if (p.life <= 0) continue;
+      p.life -= p.decay;
+      p.x += p.vx; p.y += p.vy;
+      if (p.kind === 'confetti') { p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.25; p.rot += p.vr; }
+      else { p.vx *= 0.955; p.vy = p.vy * 0.955 + 0.12; }
+      c.globalAlpha = Math.max(0, p.life);
+      c.fillStyle = p.color;
+      if (p.kind === 'confetti') {
+        c.globalCompositeOperation = 'source-over';
+        c.save(); c.translate(p.x, p.y); c.rotate(p.rot);
+        c.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2 * Math.abs(Math.cos(p.rot * 2)) + 1);
+        c.restore();
+        c.globalCompositeOperation = 'lighter';
+      } else {
+        c.beginPath(); c.arc(p.x, p.y, p.size, 0, Math.PI * 2); c.fill();
+        c.globalAlpha *= 0.35; c.beginPath(); c.arc(p.x - p.vx * 2, p.y - p.vy * 2, p.size * 0.8, 0, Math.PI * 2); c.fill();
+      }
+    }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    if (now - t0 < 4200) requestAnimationFrame(frame);
+    else { timers.forEach(clearTimeout); c.clearRect(0, 0, W, H); }
+  };
+  requestAnimationFrame(frame);
+}
+
 const fmt = (ms) => {
   const s = Math.ceil(ms / 1000);
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -414,22 +594,41 @@ const fmt = (ms) => {
 // ---------------------------------------------------------------------
 const canvas = $('wheel');
 const ctx = canvas.getContext('2d');
+const SIZE = 520; // taille logique ; le canvas est rendu en haute définition
+const dpr = Math.min(window.devicePixelRatio || 1, 3);
+canvas.width = canvas.height = SIZE * dpr;
+
 let genres = store.get('mw_genres_v2', DEFAULT_GENRES);
+let played = store.get('mw_played', []).filter((g) => genres.includes(g));
 let rotation = 0;
 let spinning = false;
+let spinList = null;   // genres figés pendant que la roue tourne
+let winner = null;     // genre sur lequel la roue s'est arrêtée
 
-const colorFor = (i, n) => `hsl(${Math.round((360 / n) * i)}, 70%, 52%)`;
+const colorFor = (g) => {
+  const i = Math.max(0, genres.indexOf(g));
+  return `hsl(${Math.round((360 / Math.max(1, genres.length)) * i)}, 72%, 52%)`;
+};
+const removeMode = () => $('removePlayed').checked;
+// Genres présents sur la roue (sans ceux déjà joués si le mode est actif)
+const wheelGenres = () => spinList || (removeMode() ? genres.filter((g) => !played.includes(g)) : genres);
 
 function drawWheel() {
-  const { width: W, height: H } = canvas;
-  const cx = W / 2, cy = H / 2, r = Math.min(cx, cy) - 8;
-  ctx.clearRect(0, 0, W, H);
-  const n = genres.length;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = SIZE / 2, cy = SIZE / 2, r = SIZE / 2 - 14;
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  const list = wheelGenres();
+  const n = list.length;
+
+  // anneau extérieur
+  ctx.beginPath(); ctx.arc(cx, cy, r + 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.strokeStyle = '#2f2f2f'; ctx.lineWidth = 2; ctx.stroke();
 
   if (!n) {
-    ctx.fillStyle = '#2a2a2a';
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#a7a7a7'; ctx.font = '20px system-ui'; ctx.textAlign = 'center';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#242424'; ctx.fill();
+    ctx.fillStyle = '#a7a7a7'; ctx.font = '600 20px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('Ajoute des genres →', cx, cy);
     return;
   }
@@ -437,13 +636,17 @@ function drawWheel() {
   const seg = (Math.PI * 2) / n;
   for (let i = 0; i < n; i++) {
     const a0 = rotation + i * seg;
+    const color = colorFor(list[i]);
+    const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, r);
+    grad.addColorStop(0, color.replace('52%)', '38%)'));
+    grad.addColorStop(1, color);
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, r, a0, a0 + seg);
     ctx.closePath();
-    ctx.fillStyle = colorFor(i, n);
+    ctx.fillStyle = grad;
     ctx.fill();
-    ctx.strokeStyle = '#121212'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 2; ctx.stroke();
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -451,22 +654,44 @@ function drawWheel() {
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
-    const size = Math.max(12, Math.min(22, 220 / n + 6));
-    ctx.font = `700 ${size}px system-ui, sans-serif`;
-    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 3;
-    let label = parseGenre(genres[i]).label;
-    while (ctx.measureText(label).width > r - 60 && label.length > 3) label = label.slice(0, -2) + '…';
-    ctx.fillText(label, r - 18, 0);
+    const size = Math.max(12, Math.min(24, 220 / n + 7));
+    ctx.font = `800 ${size}px system-ui, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 4;
+    let label = parseGenre(list[i]).label;
+    while (ctx.measureText(label).width > r - 70 && label.length > 3) label = label.slice(0, -2) + '…';
+    ctx.fillText(label, r - 20, 0);
     ctx.restore();
   }
+
+  // segment gagnant mis en valeur
+  const w = list.indexOf(winner);
+  if (!spinning && w >= 0) {
+    const a0 = rotation + w * seg;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a0, a0 + seg); ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fill();
+    ctx.shadowColor = '#fff'; ctx.shadowBlur = 16;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+  }
+
+  // petites lumières sur l'anneau
+  const bulbs = 28;
+  for (let i = 0; i < bulbs; i++) {
+    const a = (i / bulbs) * Math.PI * 2 + (spinning ? rotation * 0.2 : 0);
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (r + 5), cy + Math.sin(a) * (r + 5), 2.4, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.85)' : 'rgba(29,185,84,.9)'; ctx.fill();
+  }
+
   // moyeu
-  ctx.beginPath(); ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI * 2);
   ctx.fillStyle = '#121212'; ctx.fill();
-  ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.strokeStyle = '#f2f2f2'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.fillStyle = '#1db954'; ctx.font = '26px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('♫', cx, cy + 1);
 }
 
-function winnerIndex() {
-  const n = genres.length;
+function winnerIndex(n) {
   const seg = (Math.PI * 2) / n;
   const TAU = Math.PI * 2;
   // le pointeur est en haut (angle -90°)
@@ -477,10 +702,14 @@ function winnerIndex() {
 function spin() {
   if (spinning) return;
   if (genres.length < 2) { say('Ajoute au moins 2 genres pour tourner la roue.', true); return; }
+  if (!wheelGenres().length) resetPlayed(true);
   // Le lecteur navigateur doit être "activé" par un clic (règle d'autoplay des navigateurs)
   player?.activateElement?.();
+  spinList = wheelGenres().slice();
   spinning = true;
+  winner = null;
   $('spinBtn').disabled = true;
+  document.body.classList.add('spinning');
   say('');
 
   const start = rotation;
@@ -495,11 +724,35 @@ function spin() {
     drawWheel();
     if (t < 1) return requestAnimationFrame(frame);
     rotation %= Math.PI * 2;
+    winner = spinList[winnerIndex(spinList.length)];
+    spinList = null;
     spinning = false;
     $('spinBtn').disabled = false;
-    startSession(genres[winnerIndex()]);
+    document.body.classList.remove('spinning');
+    drawWheel();
+    startSession(winner);
   };
   requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------------
+//  Genres joués (mode « retirer de la roue une fois joué »)
+// ---------------------------------------------------------------------
+function markPlayed(entry) {
+  if (!entry || !removeMode() || played.includes(entry)) return;
+  played.push(entry);
+  if (winner === entry) winner = null;
+  store.set('mw_played', played);
+  // Tout a été joué : la roue se remplit à nouveau pour un nouveau tour
+  if (!genres.some((g) => !played.includes(g))) resetPlayed(true);
+  else renderGenres();
+}
+
+function resetPlayed(auto = false) {
+  played = [];
+  store.set('mw_played', played);
+  renderGenres();
+  if (auto) say('🔁 Tous les genres ont été joués : la roue est de nouveau complète !');
 }
 
 // ---------------------------------------------------------------------
@@ -508,15 +761,26 @@ function spin() {
 function renderGenres() {
   const ul = $('genreList');
   ul.innerHTML = '';
+  const mode = removeMode();
   genres.forEach((g, i) => {
     const { label, query } = parseGenre(g);
+    const isPlayed = mode && played.includes(g);
     const li = document.createElement('li');
-    li.innerHTML = `<span class="dot"></span><span class="name"></span><button title="Supprimer">✕</button>`;
-    li.querySelector('.dot').style.background = colorFor(i, genres.length);
+    li.classList.toggle('played', isPlayed);
+    li.innerHTML = `<span class="dot"></span><span class="name"></span>${isPlayed ? '<span class="tag">joué</span>' : ''}<button title="Supprimer">✕</button>`;
+    li.querySelector('.dot').style.background = colorFor(g);
     li.querySelector('.name').textContent = label + (normalize(label) !== query ? `  (${query})` : '');
-    li.querySelector('button').onclick = () => { genres.splice(i, 1); saveGenres(); };
+    li.querySelector('button').onclick = () => {
+      genres.splice(i, 1);
+      played = played.filter((p) => genres.includes(p));
+      store.set('mw_played', played);
+      saveGenres();
+    };
     ul.appendChild(li);
   });
+  const left = mode ? genres.filter((g) => !played.includes(g)).length : genres.length;
+  $('genreCount').textContent = mode && played.length ? `${left} / ${genres.length} restants` : `${genres.length} genres`;
+  $('resetPlayed').hidden = !(mode && played.length);
   drawWheel();
 }
 
@@ -525,47 +789,121 @@ function saveGenres() { store.set('mw_genres_v2', genres); renderGenres(); }
 // ---------------------------------------------------------------------
 //  Init
 // ---------------------------------------------------------------------
+function setDuration(min) {
+  $('duration').value = min;
+  store.set('mw_duration', min);
+  document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('active', Number(b.dataset.min) === min));
+  if (!session) $('timer').textContent = fmt(min * 60_000);
+}
+
 function bindUI() {
-  $('redirectHint').textContent = REDIRECT_URI;
-  $('clientId').value = store.get('mw_client_id', '') || DEFAULT_CLIENT_ID;
-  store.set('mw_client_id', $('clientId').value);
-  $('clientId').onchange = (e) => store.set('mw_client_id', e.target.value.trim());
-  $('duration').value = store.get('mw_duration', 15);
-  $('duration').onchange = (e) => store.set('mw_duration', Number(e.target.value) || 15);
-  $('autoSpin').checked = store.get('mw_autospin', false);
-  $('autoSpin').onchange = (e) => store.set('mw_autospin', e.target.checked);
+  store.set('mw_client_id', DEFAULT_CLIENT_ID);
+  setDuration(store.get('mw_duration', 15));
+  $('duration').onchange = (e) => setDuration(Math.min(180, Math.max(1, Number(e.target.value) || 15)));
+  document.querySelectorAll('#presets button').forEach((b) => { b.onclick = () => setDuration(Number(b.dataset.min)); });
+  $('autoSpin').checked = store.get('mw_autospin_v2', true);
+  $('autoSpin').onchange = (e) => store.set('mw_autospin_v2', e.target.checked);
+  $('removePlayed').checked = store.get('mw_remove_played', true);
+  $('removePlayed').onchange = (e) => { store.set('mw_remove_played', e.target.checked); renderGenres(); };
   $('deviceSelect').onchange = (e) => store.set('mw_device', e.target.value);
 
   $('loginBtn').onclick = login;
   $('logoutBtn').onclick = logout;
   $('refreshDevices').onclick = refreshDevices;
   $('spinBtn').onclick = spin;
-  $('stopBtn').onclick = () => { stopSession(true); say('Session arrêtée.'); };
+  $('stopBtn').onclick = () => { stopSession(true); say('Session arrêtée.'); if (updatePending) applyUpdate(false); };
   $('pauseBtn').onclick = () => control('toggle');
   $('nextBtn').onclick = () => control('next');
   $('prevBtn').onclick = () => control('previous');
-  $('resetGenres').onclick = () => { genres = [...DEFAULT_GENRES]; saveGenres(); };
+  $('resetPlayed').onclick = () => resetPlayed();
+  $('resetGenres').onclick = () => { genres = [...DEFAULT_GENRES]; played = []; store.set('mw_played', played); saveGenres(); };
   $('addForm').onsubmit = (e) => {
     e.preventDefault();
     const v = $('genreInput').value.trim();
     if (!v) return;
+    if (genres.some((g) => normalize(g) === normalize(v))) { say(`« ${v} » est déjà sur la roue.`, true); return; }
     genres.push(v);
     $('genreInput').value = '';
+    say('');
     saveGenres();
   };
+  // Espace = tourner la roue (hors champs de saisie)
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(document.activeElement?.tagName)) { e.preventDefault(); spin(); }
+  });
 }
 
 async function updateAuthUI() {
   const logged = isLoggedIn();
   $('loginBtn').hidden = logged;
   $('logoutBtn').hidden = !logged;
+  $('auth').classList.toggle('on', logged);
   if (!logged) { $('authStatus').textContent = 'Non connecté à Spotify'; return; }
   try {
     const me = await api('/me');
-    $('authStatus').textContent = `Connecté : ${me.display_name || me.id}${me.product ? ` (${me.product})` : ''}`;
+    $('authStatus').textContent = `${me.display_name || me.id}${me.product ? ` · ${me.product}` : ''}`;
   } catch (e) {
     $('authStatus').textContent = 'Connecté (profil indisponible)';
   }
+}
+
+// ---------------------------------------------------------------------
+//  Mise à jour à distance : la page se recharge toute seule quand une
+//  nouvelle version est en ligne (vérifiée toutes les 30 s)
+// ---------------------------------------------------------------------
+let toastTimer = null;
+function toast(msg, ms = 4000) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  if (ms) toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// Fichiers surveillés : la page elle-même + nos scripts/styles locaux
+const watchedUrls = () => [location.pathname, ...[...document.querySelectorAll('script[src], link[rel="stylesheet"]')]
+  .map((e) => e.getAttribute('src') || e.getAttribute('href'))
+  .filter((u) => u && !/^(https?:)?\/\//.test(u))];
+
+function hashText(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return h;
+}
+
+// cache: 'reload' contourne le cache ET le remplace par la version fraîche,
+// donc le rechargement qui suit utilise bien les nouveaux fichiers
+async function snapshot() {
+  const texts = await Promise.all(watchedUrls().map((u) =>
+    fetch(u, { cache: 'reload' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error(r.status))))));
+  return hashText(texts.join('\u0000'));
+}
+
+let baseline = null;
+let updatePending = false;
+
+async function checkForUpdate() {
+  if (updatePending) return;
+  try {
+    const h = await snapshot();
+    if (baseline === null) { baseline = h; return; }
+    if (h === baseline) return;
+    updatePending = true;
+    if (!session && !spinning) applyUpdate(false);
+    else toast('🔄 Nouvelle version en ligne : elle s\'appliquera à la fin de la session.', 8000);
+  } catch { /* hors ligne / serveur coupé : on réessaiera */ }
+}
+
+function applyUpdate(spinAfter) {
+  if (spinAfter) store.set('mw_spin_after_update', true);
+  toast('✨ Nouvelle version — mise à jour…', 0);
+  setTimeout(() => location.reload(), 1200);
+}
+
+function startUpdateWatcher() {
+  checkForUpdate();
+  setInterval(checkForUpdate, 30_000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
 }
 
 (async () => {
@@ -574,4 +912,11 @@ async function updateAuthUI() {
   try { await handleRedirect(); } catch (e) { say('Connexion échouée : ' + e.message, true); }
   await updateAuthUI();
   if (isLoggedIn()) { initPlayer(); refreshDevices(); }
+  startUpdateWatcher();
+  // Rechargé par une mise à jour en fin de session : la roue repart toute seule
+  if (store.get('mw_spin_after_update')) {
+    store.del('mw_spin_after_update');
+    toast('✅ Page mise à jour !');
+    setTimeout(spin, 2500);
+  }
 })();

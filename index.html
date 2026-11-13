@@ -4,67 +4,109 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Music Wheel</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div id="boom" aria-live="polite"><i>⏰</i><span>Temps écoulé !</span><small>Nouveau genre dans un instant…</small></div>
+
+  <div id="toast" role="status"></div>
+
   <header>
-    <h1>🎡 Music Wheel</h1>
+    <h1><span class="logo">🎡</span> Music <em>Wheel</em></h1>
     <div id="auth">
-      <span id="authStatus">Non connecté à Spotify</span>
+      <span id="authStatus" class="status">Non connecté à Spotify</span>
       <button id="loginBtn">Se connecter à Spotify</button>
       <button id="logoutBtn" class="ghost" hidden>Déconnexion</button>
     </div>
   </header>
 
   <main>
+    <section class="lyrics-panel">
+      <h2>🎤 Paroles</h2>
+      <div class="lyrics-track" id="lyricsTrack"></div>
+      <div class="lyrics" id="lyrics">
+        <p class="lyrics-empty">Les paroles du morceau en cours s'afficheront ici.</p>
+      </div>
+    </section>
+
     <section class="wheel-zone">
       <div class="wheel-wrap">
         <div class="pointer"></div>
-        <canvas id="wheel" width="520" height="520"></canvas>
+        <canvas id="wheel"></canvas>
       </div>
-      <button id="spinBtn" class="big">Tourner la roue</button>
+      <button id="spinBtn" class="big">🎲 Tourner la roue</button>
+      <div class="kbd-hint">ou appuie sur <kbd>Espace</kbd></div>
       <div id="result" hidden>
-        <div class="genre-label">Genre tiré : <strong id="resultGenre"></strong></div>
+        <div class="genre-label">Genre tiré</div>
+        <div class="genre-name" id="resultGenre"></div>
         <div class="timer" id="timer">15:00</div>
+        <div class="progress"><div id="progressBar"></div></div>
         <div class="playlist" id="playlistInfo"></div>
         <div class="now" id="nowPlaying"></div>
         <div class="controls">
-          <button id="prevBtn" class="ghost">⏮</button>
-          <button id="pauseBtn" class="ghost">⏯</button>
-          <button id="nextBtn" class="ghost">⏭</button>
-          <button id="stopBtn" class="ghost">Arrêter la session</button>
+          <button id="prevBtn" class="ghost round" title="Précédent">⏮</button>
+          <button id="pauseBtn" class="round" title="Lecture / pause">⏯</button>
+          <button id="nextBtn" class="ghost round" title="Suivant">⏭</button>
+          <button id="stopBtn" class="ghost danger">■ Arrêter</button>
         </div>
       </div>
       <div id="message"></div>
     </section>
 
-    <aside>
-      <h2>Genres sur la roue</h2>
-      <form id="addForm">
-        <input id="genreInput" placeholder="Ajouter un genre (ex : Jazz)" autocomplete="off">
-        <button type="submit">+</button>
-      </form>
-      <ul id="genreList"></ul>
-      <button id="resetGenres" class="ghost small">Remettre les genres par défaut</button>
+    <aside class="side">
+      <div class="card">
+        <div class="card-head">
+          <h2>🎶 Genres</h2>
+          <span class="badge" id="genreCount"></span>
+        </div>
+        <form id="addForm" class="add">
+          <input id="genreInput" placeholder="Ajouter un genre (ex : Jazz)" autocomplete="off">
+          <button type="submit" class="icon-btn" title="Ajouter">＋</button>
+        </form>
+        <ul id="genreList"></ul>
+        <div class="row">
+          <button id="resetPlayed" class="ghost small" hidden>↺ Remettre les genres joués</button>
+          <button id="resetGenres" class="ghost small">Genres par défaut</button>
+        </div>
+      </div>
 
-      <h2>Réglages</h2>
-      <label>Durée d'une session (minutes)
-        <input id="duration" type="number" min="1" max="180" value="15">
-      </label>
-      <label class="check"><input id="autoSpin" type="checkbox"> Relancer la roue automatiquement à la fin</label>
-      <label>Appareil de lecture
-        <select id="deviceSelect"><option value="">— connecte-toi d'abord —</option></select>
-      </label>
-      <button id="refreshDevices" class="ghost small">Rafraîchir les appareils</button>
-      <label>Spotify Client ID
-        <input id="clientId" placeholder="Colle ici le Client ID de ton app Spotify">
-      </label>
-      <p class="hint">Redirect URI à déclarer dans le dashboard Spotify :<br><code id="redirectHint"></code></p>
+      <div class="card">
+        <h2>⚙️ Réglages</h2>
+        <div class="field">
+          <span class="field-label">Durée d'une session</span>
+          <div class="duration">
+            <div class="presets" id="presets">
+              <button type="button" data-min="5">5</button>
+              <button type="button" data-min="10">10</button>
+              <button type="button" data-min="15">15</button>
+              <button type="button" data-min="30">30</button>
+            </div>
+            <div class="custom"><input id="duration" type="number" min="1" max="180" value="15"><span>min</span></div>
+          </div>
+        </div>
+        <label class="switch">
+          <input id="autoSpin" type="checkbox" checked><span class="slider"></span>
+          <span>Relancer la roue automatiquement</span>
+        </label>
+        <label class="switch">
+          <input id="removePlayed" type="checkbox" checked><span class="slider"></span>
+          <span>Retirer le genre de la roue une fois joué</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>🔊 Appareil de lecture</h2>
+        <div class="device-row">
+          <select id="deviceSelect"><option value="">— connecte-toi d'abord —</option></select>
+          <button id="refreshDevices" class="icon-btn ghost" title="Rafraîchir les appareils">⟳</button>
+        </div>
+      </div>
     </aside>
   </main>
 
   <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=7"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
