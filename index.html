@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=19">
   <script>
     (() => {
       const q = new URLSearchParams(location.search), cl = document.documentElement.classList;
@@ -143,8 +143,16 @@
           </div>
         </div>
 
-        <div class="card">
-          <h2><svg class="i"><use href="#i-sliders"/></svg> Réglages</h2>
+        <details class="card fold" id="settingsFold">
+          <summary><h2><svg class="i"><use href="#i-sliders"/></svg> Réglages</h2><svg class="i chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary>
+          <div class="fold-body">
+          <div class="field">
+            <span class="field-label"><svg class="i"><use href="#i-speaker"/></svg> Appareil de lecture</span>
+            <div class="device-row">
+              <select id="deviceSelect"><option value="">Connecte-toi d'abord</option></select>
+              <button id="refreshDevices" class="icon-btn ghost" title="Rafraîchir les appareils"><svg class="i"><use href="#i-refresh"/></svg></button>
+            </div>
+          </div>
           <div class="field">
             <span class="field-label">Durée d'une session</span>
             <div class="duration">
@@ -185,15 +193,8 @@
             <button id="trollBtn" class="ghost small" type="button">Lancer un troll maintenant</button>
             <a class="ghost-link" href="?admin" target="_blank">Modérer le chat</a>
           </div>
-        </div>
-
-        <div class="card">
-          <h2><svg class="i"><use href="#i-speaker"/></svg> Appareil de lecture</h2>
-          <div class="device-row">
-            <select id="deviceSelect"><option value="">Connecte-toi d'abord</option></select>
-            <button id="refreshDevices" class="icon-btn ghost" title="Rafraîchir les appareils"><svg class="i"><use href="#i-refresh"/></svg></button>
           </div>
-        </div>
+        </details>
       </aside>
     </main>
 
@@ -229,7 +230,7 @@
 
   <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=19"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>

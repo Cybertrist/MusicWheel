@@ -1278,6 +1278,29 @@ function drawWheel() {
 
 // Boucle d'animation : lumières + rotation lente de la roue quand rien ne se passe
 const wheelWrap = document.querySelector('.wheel-wrap');
+
+// Taille de la roue calculée sur la place réellement disponible : elle ne passe
+// jamais sous l'en-tête et le bouton ne la chevauche jamais, quel que soit l'écran.
+const RING = 1.24;  // la roue + l'anneau du visualiseur + le pointeur
+function fitStage() {
+  const header = document.querySelector('.host header');
+  document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`);
+  const zone = document.querySelector('.wheel-zone');
+  if (innerWidth <= 1220) { wheelWrap.style.width = ''; wheelWrap.style.margin = ''; return; }
+  const gap = parseFloat(getComputedStyle(zone).rowGap) || 14;
+  const others = [...zone.children].filter((el) => el !== wheelWrap && el.offsetParent !== null);
+  const used = others.reduce((h, el) => h + el.offsetHeight, 0) + gap * others.length;
+  const size = Math.floor(Math.max(140, Math.min(780, (zone.clientHeight - used) / RING, zone.clientWidth / RING)));
+  wheelWrap.style.width = `${size}px`;
+  wheelWrap.style.margin = `${Math.round(size * (RING - 1) / 2)}px 0`;
+}
+addEventListener('resize', fitStage);
+{
+  const ro = new ResizeObserver(() => fitStage());
+  ro.observe(document.querySelector('.wheel-zone'));
+  ro.observe(document.querySelector('.host header'));
+  for (const id of ['result', 'message', 'spinBtn']) ro.observe($(id));
+}
 function wheelLoop(now = performance.now()) {
   if (!spinning) {
     if (!session && !winner) rotation = (rotation + 0.0016) % (Math.PI * 2);
@@ -1427,6 +1450,8 @@ function bindUI() {
   $('removePlayed').checked = store.get('mw_remove_played', true);
   $('removePlayed').onchange = (e) => { store.set('mw_remove_played', e.target.checked); renderGenres(); };
   $('deviceSelect').onchange = (e) => store.set('mw_device', e.target.value);
+  $('settingsFold').open = store.get('mw_settings_open', false);
+  $('settingsFold').ontoggle = (e) => store.set('mw_settings_open', e.target.open);
   $('sfx').checked = store.get('mw_sfx', true);
   $('sfx').onchange = (e) => store.set('mw_sfx', e.target.checked);
   $('trollMode').checked = store.get('mw_troll', true);
@@ -1761,6 +1786,7 @@ const adminMode = document.documentElement.classList.contains('admin-mode');
   renderGenres();
   try { await handleRedirect(); } catch (e) { say('Connexion échouée : ' + e.message, true); }
   await updateAuthUI();
+  fitStage();
   wheelLoop();
   if (isLoggedIn()) { initPlayer(); await refreshDevices(); }
   startUpdateWatcher();

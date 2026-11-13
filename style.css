@@ -281,8 +281,7 @@ kbd { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15)
 @keyframes qrPulse { 50% { box-shadow: 0 20px 50px rgba(0,0,0,.35), 0 0 0 6px rgba(30,215,96,.28); } }
 .qr-card {
   flex: none; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; text-align: center; text-decoration: none; color: var(--text);
-  border-color: rgba(30,215,96,.35);
-  animation: rise .7s var(--ease-pop) both .2s, qrPulse 2.6s ease-in-out infinite 1s;
+  animation: rise .7s var(--ease-pop) both .2s;
 }
 .qr-text { display: flex; flex-direction: column; gap: 6px; }
 .qr-text strong { font-family: "Space Grotesk", sans-serif; font-size: 1.5rem; line-height: 1.15; }
@@ -306,7 +305,7 @@ kbd { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15)
   position: relative; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 14px 40vh 0; scroll-behavior: smooth;
   -webkit-mask-image: linear-gradient(transparent, #000 8%, #000 85%, transparent); mask-image: linear-gradient(transparent, #000 8%, #000 85%, transparent);
 }
-.lyrics p { margin: 0 0 12px; line-height: 1.45; }
+.lyrics p { margin: 0 0 12px; line-height: 1.45; overflow-wrap: anywhere; }
 .lyrics .line { color: rgba(255,255,255,.32); font-weight: 700; font-size: 1.08rem; transition: color .3s, transform .3s, filter .3s; transform-origin: left; filter: blur(.4px); }
 .lyrics .line.past { color: rgba(255,255,255,.5); filter: none; }
 .lyrics .line.active { color: #fff; transform: scale(1.03); filter: none; text-shadow: 0 0 22px color-mix(in srgb, var(--genre) 60%, transparent); }
@@ -446,7 +445,7 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 #viz { position: absolute; inset: -11%; width: 122%; height: 122%; z-index: 0; pointer-events: none; }
 #wheel { position: relative; z-index: 1; }
 .pointer { z-index: 3; }
-.wheel-wrap { transition: transform .8s var(--ease-pop), width .9s var(--ease-pop); }
+.wheel-wrap { transition: transform .8s var(--ease-pop), width .9s var(--ease-pop), margin .9s var(--ease-pop); }
 .spinning .wheel-wrap { transform: scale(1.05); }
 .spinning .pointer { animation: none; }
 .pointer.flick { animation: flick .14s ease-out; }
@@ -563,14 +562,15 @@ body.troll #trollInfo { opacity: 1; transform: none; }
 /* ------------------------------------------------------------------ */
 @media (min-width: 1221px) {
   main {
-    height: var(--stage-h); min-height: 600px; padding: 22px 28px; align-items: stretch;
+    height: var(--stage-h); min-height: 420px; padding: 20px 28px; align-items: stretch;
     grid-template-columns: clamp(300px, 22vw, 380px) minmax(0, 1fr) clamp(320px, 22vw, 380px);
     max-width: 1800px;
   }
-  .left-col { position: static; height: 100%; min-height: 0; }
+  .left-col { position: static; height: 100%; min-height: 0; overflow: hidden; }
+  .lyrics-panel { overflow: hidden; }
   .side { height: 100%; min-height: 0; overflow-y: auto; padding: 2px 6px 2px 2px; margin-right: -6px; }
   .side .card { flex: none; }
-  .wheel-zone { height: 100%; min-height: 0; justify-content: center; gap: 16px; }
+  .wheel-zone { height: 100%; min-height: 0; justify-content: center; gap: 14px; }
   .wheel-zone > * { flex: none; }
   /* la roue prend toute la hauteur disponible… */
   .wheel-wrap { width: min(100%, calc(var(--stage-h) - 200px), 760px); }
@@ -608,3 +608,18 @@ body.troll #trollInfo { opacity: 1; transform: none; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 999px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* Réglages repliables */
+.fold summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; user-select: none; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary h2 { margin: 0; }
+.fold summary .chevron { color: var(--muted); width: 20px; height: 20px; transition: transform .35s var(--ease-pop), color .2s; }
+.fold summary:hover .chevron { color: var(--text); }
+.fold[open] summary .chevron { transform: rotate(180deg); }
+.fold[open] .fold-body { margin-top: 14px; animation: foldIn .35s var(--ease-pop); }
+@keyframes foldIn { from { opacity: 0; transform: translateY(-8px); } }
+.field-label .i { color: var(--accent); margin-right: 4px; }
+/* pendant un genre, le bouton de la roue se fait plus discret pour laisser la place */
+@media (min-width: 1221px) {
+  body.live button.big { font-size: 1.05rem; padding: 11px 30px; }
+}
