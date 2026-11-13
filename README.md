@@ -24,7 +24,7 @@ et Spotify joue des morceaux de ce genre pendant 15 minutes (durée réglable). 
 - Mode « Retirer le genre de la roue une fois joué » : la roue se vide au fil des sessions puis se remplit à nouveau.
 - Fin du chrono : explosion plein écran, puis la roue se relance (si l'option est cochée). Raccourci : `Espace` pour tourner.
 - Mise à jour à distance : la page vérifie toutes les 30 s si une nouvelle version est en ligne et se recharge toute seule
-  (immédiatement si rien ne joue, sinon à la fin de la session en cours).
+  (immédiatement si rien ne joue, sinon au prochain tirage de la roue, puis la roue tourne toute seule).
 - Les paroles du morceau en cours s'affichent à gauche (synchronisées quand c'est possible), via [LRCLIB](https://lrclib.net).
 
 ## Comment ça marche

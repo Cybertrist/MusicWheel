@@ -369,8 +369,8 @@ function tick() {
     const auto = $('autoSpin').checked;
     celebrate(auto);
     say(auto ? '⏰ Session terminée ! La roue repart…' : '⏰ Session terminée ! Relance la roue pour un nouveau genre.');
-    if (updatePending) setTimeout(() => applyUpdate(auto), 3300);
-    else if (auto) setTimeout(spin, 3300);
+    if (auto) setTimeout(spin, 3300);
+    else if (updatePending) setTimeout(() => applyUpdate(false), 3300);
   }
 }
 
@@ -701,6 +701,8 @@ function winnerIndex(n) {
 
 function spin() {
   if (spinning) return;
+  // Nouvelle version en ligne : on recharge la page (F5) puis la roue tourne toute seule
+  if (updatePending) { stopSession(true); applyUpdate(true); return; }
   if (genres.length < 2) { say('Ajoute au moins 2 genres pour tourner la roue.', true); return; }
   if (!wheelGenres().length) resetPlayed(true);
   // Le lecteur navigateur doit être "activé" par un clic (règle d'autoplay des navigateurs)
@@ -890,7 +892,7 @@ async function checkForUpdate() {
     if (h === baseline) return;
     updatePending = true;
     if (!session && !spinning) applyUpdate(false);
-    else toast('🔄 Nouvelle version en ligne : elle s\'appliquera à la fin de la session.', 8000);
+    else toast('🔄 Nouvelle version en ligne : la page se mettra à jour au prochain tirage.', 8000);
   } catch { /* hors ligne / serveur coupé : on réessaiera */ }
 }
 
@@ -911,12 +913,12 @@ function startUpdateWatcher() {
   renderGenres();
   try { await handleRedirect(); } catch (e) { say('Connexion échouée : ' + e.message, true); }
   await updateAuthUI();
-  if (isLoggedIn()) { initPlayer(); refreshDevices(); }
+  if (isLoggedIn()) { initPlayer(); await refreshDevices(); }
   startUpdateWatcher();
   // Rechargé par une mise à jour en fin de session : la roue repart toute seule
   if (store.get('mw_spin_after_update')) {
     store.del('mw_spin_after_update');
     toast('✅ Page mise à jour !');
-    setTimeout(spin, 2500);
+    setTimeout(spin, 2000);
   }
 })();
