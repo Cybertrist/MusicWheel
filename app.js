@@ -372,6 +372,7 @@ function tick() {
   const secs = Math.ceil(left / 1000);
   if (secs >= 1 && secs <= 5 && secs !== session.lastCount) { session.lastCount = secs; showCount(secs); }
   TROLL.maybe();
+  $('trollInfo').textContent = `${parseGenre(session.genre).label} · ${fmt(Math.max(0, left))}`;
   if (left <= 0) {
     TROLL.stop();
     stopSession(true);
@@ -392,6 +393,7 @@ function stopSession(pause = true) {
   const played = session.genre;
   session = null;
   $('timer').textContent = '00:00';
+  $('trollInfo').textContent = '';
   $('progressBar').style.width = '0%';
   $('result').classList.remove('live', 'playing');
   document.body.classList.remove('live');
@@ -831,171 +833,277 @@ const TROLL = (() => {
   const layer = $('troll');
   const cv = $('trollCv');
   const c = cv.getContext('2d');
-  let W = 0, H = 0, raf = 0, endTimer = 0, active = false, nextAt = 0;
+  let W = 0, H = 0, raf = 0, endTimer = 0, active = false, nextAt = 0, lastScene = '';
+  layer.addEventListener('click', () => stop());
   const SCALE = 0.75;
   const resize = () => { W = innerWidth; H = innerHeight; cv.width = W * SCALE; cv.height = H * SCALE; c.setTransform(SCALE, 0, 0, SCALE, 0, 0); };
   addEventListener('resize', () => { if (active) resize(); });
   const font = (px, w = 700) => `${w} ${px}px "Space Grotesk", Inter, sans-serif`;
 
+  // Hauteur utile (le bandeau du chat occupe le bas de l'écran)
+  const TICKER = 76;
   const SCENES = {
     disco: { name: 'Mode disco', make() {
       return (t) => {
-        c.fillStyle = '#06020d'; c.fillRect(0, 0, W, H);
-        const cx = W / 2, cy = H * 0.14, R = Math.min(W, H) * 0.09;
-        c.globalCompositeOperation = 'lighter';
-        for (let i = 0; i < 10; i++) {
-          const a = Math.PI / 2 + Math.sin(t / 650 + i * 1.3) * 1.1;
-          const hue = (i * 36 + t / 8) % 360;
-          const g = c.createLinearGradient(cx, cy, cx + Math.cos(a) * H * 1.4, cy + Math.sin(a) * H * 1.4);
-          g.addColorStop(0, `hsla(${hue}, 100%, 60%, .6)`); g.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
-          c.fillStyle = g;
-          c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, H * 1.5, a - 0.06, a + 0.06); c.closePath(); c.fill();
+        const CH = H - TICKER, cx = W / 2;
+        c.fillStyle = '#05010b'; c.fillRect(0, 0, W, H);
+        const beat = Math.pow(1 - (t % 480) / 480, 2);
+        // piste de danse en perspective
+        const rows = 7, cols = 14, top = CH * 0.62;
+        for (let r = 0; r < rows; r++) {
+          const y0 = top + Math.pow(r / rows, 1.6) * (CH - top), y1 = top + Math.pow((r + 1) / rows, 1.6) * (CH - top);
+          const w0 = W * (0.5 + r / rows * 0.9), w1 = W * (0.5 + (r + 1) / rows * 0.9);
+          for (let k = 0; k < cols; k++) {
+            const on = (k + r + Math.floor(t / 240)) % 3 === 0;
+            const hue = (k * 26 + r * 40 + t / 6) % 360;
+            c.fillStyle = `hsl(${hue}, 90%, ${on ? 55 + beat * 15 : 14}%)`;
+            c.beginPath();
+            c.moveTo(cx - w0 / 2 + (w0 / cols) * k + 2, y0 + 2); c.lineTo(cx - w0 / 2 + (w0 / cols) * (k + 1) - 2, y0 + 2);
+            c.lineTo(cx - w1 / 2 + (w1 / cols) * (k + 1) - 2, y1 - 2); c.lineTo(cx - w1 / 2 + (w1 / cols) * k + 2, y1 - 2);
+            c.closePath(); c.fill();
+          }
         }
-        for (let i = 0; i < 90; i++) {
-          const a = i * 2.39 + t / 1800, r = ((i * 37) % 100) / 100;
-          c.fillStyle = `hsla(${(i * 29 + t / 6) % 360}, 100%, 70%, .85)`;
-          c.beginPath(); c.arc(cx + Math.cos(a) * r * W * 0.7, H * 0.6 + Math.sin(a) * r * H * 0.4, 2 + (i % 4), 0, 7); c.fill();
+        // faisceaux
+        const by = CH * 0.2, R = Math.min(W, CH) * 0.1;
+        c.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 12; i++) {
+          const a = Math.PI / 2 + Math.sin(t / 700 + i * 1.7) * 1.25;
+          const hue = (i * 30 + t / 8) % 360;
+          const g = c.createLinearGradient(cx, by, cx + Math.cos(a) * H, by + Math.sin(a) * H);
+          g.addColorStop(0, `hsla(${hue}, 100%, 60%, .55)`); g.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
+          c.fillStyle = g;
+          c.beginPath(); c.moveTo(cx, by); c.arc(cx, by, H * 1.3, a - 0.05, a + 0.05); c.closePath(); c.fill();
+        }
+        // reflets qui tournent
+        for (let i = 0; i < 110; i++) {
+          const a = i * 2.39 + t / 1600, r = ((i * 37) % 100) / 100;
+          c.fillStyle = `hsla(${(i * 29 + t / 6) % 360}, 100%, 75%, .9)`;
+          c.beginPath(); c.arc(cx + Math.cos(a) * r * W * 0.62, CH * 0.5 + Math.sin(a) * r * CH * 0.42, 1.5 + (i % 3), 0, 7); c.fill();
         }
         c.globalCompositeOperation = 'source-over';
         // boule à facettes
-        c.save(); c.beginPath(); c.arc(cx, cy, R, 0, 7); c.clip();
-        const tile = R / 5;
+        c.strokeStyle = '#777'; c.lineWidth = 3; c.beginPath(); c.moveTo(cx, 0); c.lineTo(cx, by - R); c.stroke();
+        c.save(); c.beginPath(); c.arc(cx, by, R, 0, 7); c.clip();
+        c.fillStyle = '#222'; c.fillRect(cx - R, by - R, R * 2, R * 2);
+        const tile = R / 6;
         for (let y = -R; y < R; y += tile) for (let x = -R; x < R; x += tile) {
-          const l = 30 + 60 * Math.abs(Math.sin(t / 180 + x * 0.09 + y * 0.13));
-          c.fillStyle = `hsl(${(t / 10 + x) % 360}, 30%, ${l}%)`;
-          c.fillRect(cx + x + 1, cy + y + 1, tile - 2, tile - 2);
+          const l = 25 + 65 * Math.abs(Math.sin(t / 160 + x * 0.08 + y * 0.11));
+          c.fillStyle = `hsl(${(t / 10 + x + y) % 360}, 25%, ${l}%)`;
+          c.fillRect(cx + x + 1, by + y + 1, tile - 2, tile - 2);
         }
+        const shine = c.createRadialGradient(cx - R * 0.4, by - R * 0.4, 0, cx, by, R);
+        shine.addColorStop(0, 'rgba(255,255,255,.55)'); shine.addColorStop(1, 'rgba(0,0,0,.35)');
+        c.fillStyle = shine; c.fillRect(cx - R, by - R, R * 2, R * 2);
         c.restore();
-        c.strokeStyle = '#999'; c.lineWidth = 3; c.beginPath(); c.moveTo(cx, 0); c.lineTo(cx, cy - R); c.stroke();
-        if (Math.floor(t / 110) % 8 === 0) { c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(0, 0, W, H); }
+        // titre
+        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
+        const hue = (t / 5) % 360, size = Math.min(W * 0.14, CH * 0.2);
+        c.font = font(size); c.shadowColor = `hsl(${hue}, 100%, 60%)`; c.shadowBlur = 40 + beat * 40;
+        c.fillStyle = '#fff'; c.translate(cx, CH * 0.47); c.scale(1 + beat * 0.06, 1 + beat * 0.06);
+        c.fillText('DISCO TIME', 0, 0);
+        c.restore();
+        if (Math.floor(t / 110) % 9 === 0) { c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(0, 0, W, H); }
       };
     } },
 
     logo: { name: 'Le logo qui rebondit', make() {
+      const w = Math.min(340, W * 0.28), h = w * 0.42;
       const logos = Array.from({ length: 5 }, (_, i) => ({
-        x: Math.random() * (W - 300), y: Math.random() * (H - 120),
-        vx: (i % 2 ? 1 : -1) * (3 + Math.random() * 3), vy: (i % 3 ? 1 : -1) * (3 + Math.random() * 3), hue: Math.random() * 360,
+        x: Math.random() * (W - w), y: Math.random() * (H - TICKER - h),
+        vx: (i % 2 ? 1 : -1) * (3.5 + Math.random() * 3), vy: (i % 3 ? 1 : -1) * (3.5 + Math.random() * 3), hue: i * 72,
       }));
-      return () => {
-        c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(0, 0, W, H);
-        const w = Math.min(320, W * 0.3), h = w * 0.38;
+      let corners = 0, lastCorner = -1e9;
+      c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+      return (t) => {
+        const CH = H - TICKER;
+        c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(0, 0, W, H);
+        // la vieille blague de l'écran de veille : va-t-il toucher le coin ?
+        const flash = Math.max(0, 1 - (t - lastCorner) / 1500);
+        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = font(Math.min(W * 0.055, CH * 0.09));
+        c.fillStyle = flash ? `rgba(255,230,0,${0.5 + flash * 0.5})` : 'rgba(255,255,255,.16)';
+        c.fillText(flash ? 'IL A TOUCHÉ LE COIN !!!' : 'VA-T-IL TOUCHER LE COIN ?', W / 2, CH / 2 - CH * 0.04);
+        c.font = font(Math.min(W * 0.022, 26), 500); c.fillStyle = 'rgba(255,255,255,.35)';
+        c.fillText(`Coins touchés : ${corners}`, W / 2, CH / 2 + CH * 0.06);
+        c.restore();
         for (const l of logos) {
           l.x += l.vx; l.y += l.vy;
           let hx = false, hy = false;
           if (l.x < 0 || l.x + w > W) { l.vx *= -1; l.x = Math.max(0, Math.min(W - w, l.x)); hx = true; }
-          if (l.y < 0 || l.y + h > H) { l.vy *= -1; l.y = Math.max(0, Math.min(H - h, l.y)); hy = true; }
+          if (l.y < 0 || l.y + h > CH) { l.vy *= -1; l.y = Math.max(0, Math.min(CH - h, l.y)); hy = true; }
           if (hx || hy) l.hue = (l.hue + 80 + Math.random() * 120) % 360;
-          if (hx && hy) { FX.burst(l.x + w / 2, l.y + h / 2, { n: 140, power: 12, kind: 'confetti' }); SFX.horn(); }
+          if (hx && hy) { corners++; lastCorner = t; FX.burst(l.x + w / 2, l.y + h / 2, { n: 160, power: 13, kind: 'confetti' }); SFX.horn(); }
           c.save(); c.translate(l.x + w / 2, l.y + h / 2);
-          c.fillStyle = `hsl(${l.hue}, 95%, 58%)`;
-          c.shadowColor = `hsl(${l.hue}, 95%, 58%)`; c.shadowBlur = 30;
+          c.fillStyle = `hsl(${l.hue}, 95%, 58%)`; c.shadowColor = `hsl(${l.hue}, 95%, 58%)`; c.shadowBlur = 35;
           c.beginPath(); c.ellipse(0, 0, w / 2, h / 2, 0, 0, 7); c.fill();
           c.shadowBlur = 0; c.fillStyle = '#000'; c.textAlign = 'center'; c.textBaseline = 'middle';
-          c.font = font(w * 0.13); c.fillText('MUSIC', 0, -h * 0.14);
-          c.font = font(w * 0.13); c.fillText('WHEEL', 0, h * 0.16);
+          c.font = font(w * 0.15); c.fillText('MUSIC', 0, -h * 0.15); c.fillText('WHEEL', 0, h * 0.17);
           c.restore();
         }
       };
     } },
 
     matrix: { name: 'Bienvenue dans la matrice', make() {
-      const fs = 20, chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホBASSDROP0123456789';
+      const fs = 22, chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホBASSDROP0123456789';
       const cols = Math.ceil(W / fs);
-      const drops = Array.from({ length: cols }, () => Math.random() * -60);
+      const drops = Array.from({ length: cols }, () => Math.random() * -40);
       c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
       return (t) => {
-        c.fillStyle = 'rgba(0,0,0,.09)'; c.fillRect(0, 0, W, H);
-        c.font = `700 ${fs}px ui-monospace, monospace`; c.textAlign = 'left';
+        const CH = H - TICKER;
+        c.fillStyle = 'rgba(0,0,0,.085)'; c.fillRect(0, 0, W, H);
+        c.font = `700 ${fs}px ui-monospace, monospace`; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
         for (let i = 0; i < cols; i++) {
-          c.fillStyle = Math.random() < 0.04 ? '#e8ffe8' : '#1dff7a';
+          c.fillStyle = Math.random() < 0.05 ? '#eaffea' : '#18ff6d';
           c.fillText(chars[Math.floor(Math.random() * chars.length)], i * fs, drops[i] * fs);
-          drops[i] = drops[i] * fs > H && Math.random() > 0.97 ? 0 : drops[i] + 1;
+          drops[i] = drops[i] * fs > CH && Math.random() > 0.97 ? 0 : drops[i] + 1;
         }
-        const a = 0.6 + 0.4 * Math.sin(t / 300);
-        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.font = font(Math.min(W * 0.075, 110)); c.shadowColor = '#1dff7a'; c.shadowBlur = 40;
-        c.fillStyle = `rgba(200,255,220,${a})`;
-        c.fillText('TU ES DANS LA MATRICE', W / 2, H / 2);
+        // titre lisible au centre, qui s'écrit lettre par lettre
+        const msg = 'TU ES DANS LA MATRICE';
+        const shown = msg.slice(0, Math.min(msg.length, Math.floor(t / 90)));
+        const size = Math.min(W * 0.07, CH * 0.13);
+        c.save();
+        c.fillStyle = 'rgba(0,0,0,.72)'; c.fillRect(0, CH / 2 - size * 1.1, W, size * 2.2);
+        c.strokeStyle = 'rgba(24,255,109,.6)'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(0, CH / 2 - size * 1.1); c.lineTo(W, CH / 2 - size * 1.1); c.moveTo(0, CH / 2 + size * 1.1); c.lineTo(W, CH / 2 + size * 1.1); c.stroke();
+        c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `700 ${size}px ui-monospace, monospace`;
+        c.shadowColor = '#18ff6d'; c.shadowBlur = 30; c.fillStyle = '#d8ffe6';
+        const cursor = Math.floor(t / 400) % 2 ? '_' : ' ';
+        c.fillText(shown + cursor, W / 2, CH / 2);
         c.restore();
       };
     } },
 
     vapor: { name: 'A E S T H E T I C', make() {
       return (t) => {
-        const sky = c.createLinearGradient(0, 0, 0, H * 0.6);
-        sky.addColorStop(0, '#120030'); sky.addColorStop(0.6, '#5a0a6e'); sky.addColorStop(1, '#ff3c8e');
-        c.fillStyle = sky; c.fillRect(0, 0, W, H * 0.6);
-        // soleil rayé
-        const sr = Math.min(W, H) * 0.22, sx = W / 2, sy = H * 0.6 - sr * 0.35;
+        const CH = H - TICKER, hy = CH * 0.6;
+        const sky = c.createLinearGradient(0, 0, 0, hy);
+        sky.addColorStop(0, '#0d0026'); sky.addColorStop(0.55, '#4b0a6b'); sky.addColorStop(1, '#ff3c8e');
+        c.fillStyle = sky; c.fillRect(0, 0, W, hy);
+        // étoiles
+        for (let i = 0; i < 60; i++) {
+          c.fillStyle = `rgba(255,255,255,${0.3 + 0.5 * Math.abs(Math.sin(t / 500 + i))})`;
+          c.fillRect((i * 173) % W, ((i * 97) % 100) / 100 * hy * 0.6, 2, 2);
+        }
+        // soleil rayé, centré sur l'horizon
+        const sr = Math.min(W, CH) * 0.25, sx = W / 2, sy = hy - sr * 0.6;
+        c.save(); c.beginPath(); c.rect(0, 0, W, hy); c.clip();
+        const glow = c.createRadialGradient(sx, sy, sr * 0.8, sx, sy, sr * 1.8);
+        glow.addColorStop(0, 'rgba(255,90,170,.5)'); glow.addColorStop(1, 'rgba(255,90,170,0)');
+        c.fillStyle = glow; c.fillRect(0, 0, W, hy);
+        c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.clip();
         const sun = c.createLinearGradient(0, sy - sr, 0, sy + sr);
-        sun.addColorStop(0, '#ffe66d'); sun.addColorStop(1, '#ff2d95');
-        c.save(); c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.clip();
+        sun.addColorStop(0, '#ffe66d'); sun.addColorStop(0.6, '#ff6b9d'); sun.addColorStop(1, '#ff2d95');
         c.fillStyle = sun; c.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
-        c.fillStyle = '#5a0a6e';
-        for (let k = 0; k < 7; k++) { const yy = sy + k * sr * 0.14 + ((t / 40) % (sr * 0.14)); c.fillRect(sx - sr, yy, sr * 2, 3 + k * 2); }
+        c.fillStyle = '#4b0a6b';
+        const gap = sr * 0.16, off = (t / 30) % gap;
+        for (let k = -1; k < 10; k++) { const yy = sy + k * gap + off; if (yy > sy) c.fillRect(sx - sr, yy, sr * 2, 1 + ((yy - sy) / sr) * 9); }
         c.restore();
-        // sol en grille néon
-        c.fillStyle = '#0b0016'; c.fillRect(0, H * 0.6, W, H * 0.4);
-        c.strokeStyle = '#ff2dd4'; c.lineWidth = 2; c.shadowColor = '#ff2dd4'; c.shadowBlur = 12;
-        const hy = H * 0.6, off = (t / 18) % 40;
-        for (let i = 0; i < 24; i++) { const y = hy + Math.pow((i * 40 + off) / 960, 2) * H * 0.4 * 2.4; if (y > H) break; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-        for (let i = -20; i <= 20; i++) { c.beginPath(); c.moveTo(W / 2 + i * 30, hy); c.lineTo(W / 2 + i * W * 0.12, H); c.stroke(); }
-        c.shadowBlur = 0;
-        c.save(); c.textAlign = 'center'; c.font = font(Math.min(W * 0.09, 130));
-        c.fillStyle = '#00f0ff'; c.fillText('ＡＥＳＴＨＥＴＩＣ', W / 2 + 5, H * 0.24 + 5);
-        c.fillStyle = '#ff5ad1'; c.fillText('ＡＥＳＴＨＥＴＩＣ', W / 2, H * 0.24);
+        // sol en grille néon qui défile
+        c.fillStyle = '#0a0014'; c.fillRect(0, hy, W, H - hy);
+        c.save(); c.beginPath(); c.rect(0, hy, W, H - hy); c.clip();
+        c.strokeStyle = '#ff2dd4'; c.lineWidth = 2; c.shadowColor = '#ff2dd4'; c.shadowBlur = 14;
+        const depth = H - hy, phase = (t / 1200) % 1;
+        for (let i = 0; i < 18; i++) {
+          const z = (i + phase) / 18, y = hy + Math.pow(z, 2.2) * depth * 1.05;
+          c.globalAlpha = Math.min(1, z * 2.5);
+          c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
+        }
+        c.globalAlpha = 1;
+        for (let i = -16; i <= 16; i++) { c.beginPath(); c.moveTo(W / 2 + i * W * 0.012, hy); c.lineTo(W / 2 + i * W * 0.11, H); c.stroke(); }
+        c.restore();
+        c.fillStyle = '#ff2dd4'; c.fillRect(0, hy - 1, W, 2);
+        // titre
+        c.save(); c.textAlign = 'center'; c.textBaseline = 'middle';
+        const size = Math.min(W * 0.085, CH * 0.14), ty = CH * 0.17 + Math.sin(t / 600) * 6, sp = size * 0.25;
+        c.font = font(size); c.letterSpacing = `${sp}px`;
+        const tx = W / 2 + sp / 2;  // l'espacement ajoute un blanc après la dernière lettre
+        c.fillStyle = '#00f0ff'; c.fillText('AESTHETIC', tx + 6, ty + 6);
+        c.fillStyle = '#ff5ad1'; c.fillText('AESTHETIC', tx, ty);
         c.restore();
       };
     } },
 
     hypno: { name: 'Regarde la spirale', make() {
       return (t) => {
-        const cx = W / 2, cy = H / 2, R = Math.hypot(W, H);
-        const rot = t / 260, n = 24;
+        const CH = H - TICKER, cx = W / 2, cy = CH / 2, R = Math.hypot(W, H);
+        const n = 28, twist = 0.004;
+        // spirale : bandes qui se tordent avec la distance
         for (let i = 0; i < n; i++) {
-          c.beginPath(); c.moveTo(cx, cy);
-          c.arc(cx, cy, R, rot + (i / n) * Math.PI * 2, rot + ((i + 0.5) / n) * Math.PI * 2);
+          c.beginPath();
+          const a0 = (i / n) * Math.PI * 2 + t / 300;
+          c.moveTo(cx, cy);
+          for (let r = 0; r <= R; r += 30) c.lineTo(cx + Math.cos(a0 + r * twist) * r, cy + Math.sin(a0 + r * twist) * r);
+          for (let r = R; r >= 0; r -= 30) c.lineTo(cx + Math.cos(a0 + Math.PI / n + r * twist) * r, cy + Math.sin(a0 + Math.PI / n + r * twist) * r);
           c.closePath();
-          c.fillStyle = i % 2 ? '#000' : `hsl(${(i * 15 + t / 5) % 360}, 100%, 55%)`;
+          c.fillStyle = `hsl(${(i * 13 + t / 4) % 360}, 100%, 55%)`;
           c.fill();
         }
-        for (let k = 12; k > 0; k--) {
-          const r = ((k * 60 + t / 4) % 720);
-          c.beginPath(); c.arc(cx, cy, r, 0, 7);
-          c.strokeStyle = `rgba(255,255,255,${0.5 - r / 1600})`; c.lineWidth = 6; c.stroke();
-        }
-        const sc = 1 + 0.15 * Math.sin(t / 200);
-        c.save(); c.translate(cx, cy); c.scale(sc, sc); c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.font = font(Math.min(W * 0.08, 120)); c.lineWidth = 10; c.strokeStyle = '#000'; c.fillStyle = '#fff';
+        c.globalCompositeOperation = 'multiply';
+        const v = c.createRadialGradient(cx, cy, 0, cx, cy, R * 0.6);
+        v.addColorStop(0, '#fff'); v.addColorStop(1, '#222');
+        c.fillStyle = v; c.fillRect(0, 0, W, H);
+        c.globalCompositeOperation = 'source-over';
+        // oeil au centre
+        const er = Math.min(W, CH) * 0.07 * (1 + 0.1 * Math.sin(t / 150));
+        c.fillStyle = '#000'; c.beginPath(); c.arc(cx, cy, er * 1.4, 0, 7); c.fill();
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(cx, cy, er, 0, 7); c.fill();
+        c.fillStyle = '#000'; c.beginPath(); c.arc(cx + Math.sin(t / 400) * er * 0.3, cy, er * 0.45, 0, 7); c.fill();
+        const sc = 1 + 0.08 * Math.sin(t / 220);
+        c.save(); c.translate(cx, CH * 0.82); c.scale(sc, sc); c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = font(Math.min(W * 0.07, CH * 0.11)); c.lineWidth = 12; c.lineJoin = 'round'; c.strokeStyle = '#000'; c.fillStyle = '#fff';
         c.strokeText('TOURNE… TOURNE…', 0, 0); c.fillText('TOURNE… TOURNE…', 0, 0);
         c.restore();
       };
     } },
 
     bass: { name: 'Bass boosted', make() {
-      document.body.classList.add('quake');
       return (t) => {
-        const beat = Math.pow(1 - ((t % 480) / 480), 2);
+        const CH = H - TICKER, cx = W / 2, cy = CH / 2;
+        const beat = Math.pow(1 - (t % 470) / 470, 2.2);
         c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+        const sx = (Math.random() - 0.5) * 26 * beat, sy = (Math.random() - 0.5) * 26 * beat;
+        c.save(); c.translate(sx, sy);
+        // haut-parleur géant
+        const R = Math.min(W, CH) * 0.36 * (1 + beat * 0.07);
         c.globalCompositeOperation = 'lighter';
-        for (let k = 0; k < 6; k++) {
-          const r = ((t / 3 + k * 140) % 840);
-          c.beginPath(); c.arc(W / 2, H / 2, r, 0, 7);
-          c.strokeStyle = `hsla(${(k * 50 + t / 6) % 360}, 100%, 60%, ${1 - r / 840})`; c.lineWidth = 18; c.stroke();
+        for (let k = 0; k < 7; k++) {
+          const r = ((t / 2.5 + k * 160) % 1100);
+          c.beginPath(); c.arc(cx, cy, r, 0, 7);
+          c.strokeStyle = `hsla(${(k * 50 + t / 6) % 360}, 100%, 60%, ${Math.max(0, 1 - r / 1100) * 0.8})`; c.lineWidth = 14; c.stroke();
         }
         c.globalCompositeOperation = 'source-over';
-        const shake = 18 * beat;
-        const sx = (Math.random() - 0.5) * shake, sy = (Math.random() - 0.5) * shake;
-        c.save(); c.translate(W / 2 + sx, H / 2 + sy); c.scale(1 + beat * 0.25, 1 + beat * 0.25);
-        c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = font(Math.min(W * 0.13, 190));
-        c.fillStyle = 'rgba(255,0,60,.9)'; c.fillText('BASS BOOSTED', -8, 0);
-        c.fillStyle = 'rgba(0,240,255,.9)'; c.fillText('BASS BOOSTED', 8, 0);
-        c.fillStyle = '#fff'; c.fillText('BASS BOOSTED', 0, 0);
+        const cone = c.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
+        cone.addColorStop(0, '#3a3a3a'); cone.addColorStop(0.35, '#0d0d0d'); cone.addColorStop(0.9, '#1c1c1c'); cone.addColorStop(1, '#555');
+        c.fillStyle = cone; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.fill();
+        c.strokeStyle = '#666'; c.lineWidth = R * 0.05; c.beginPath(); c.arc(cx, cy, R * 0.97, 0, 7); c.stroke();
+        c.fillStyle = '#222'; c.beginPath(); c.arc(cx, cy, R * 0.3 * (1 + beat * 0.25), 0, 7); c.fill();
+        // texte qui tremble avec aberration chromatique
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        const size = Math.min(W * 0.13, CH * 0.22) * (1 + beat * 0.12);
+        c.font = font(size);
+        c.fillStyle = 'rgba(255,0,60,.9)'; c.fillText('BASS BOOSTED', cx - 9 * (1 + beat), cy);
+        c.fillStyle = 'rgba(0,240,255,.9)'; c.fillText('BASS BOOSTED', cx + 9 * (1 + beat), cy);
+        c.fillStyle = '#fff'; c.fillText('BASS BOOSTED', cx, cy);
         c.restore();
-        if (beat > 0.95) c.fillStyle = 'rgba(255,255,255,.15)', c.fillRect(0, 0, W, H);
+        if (beat > 0.93) { c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(0, 0, W, H); }
       };
     } },
   };
+
+  // Neige d'écran télé (transition d'entrée / de sortie)
+  const noiseCv = document.createElement('canvas');
+  noiseCv.width = 192; noiseCv.height = 108;
+  const nctx = noiseCv.getContext('2d');
+  const noiseImg = nctx.createImageData(192, 108);
+  function drawStatic(alpha) {
+    const d = noiseImg.data;
+    for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+    nctx.putImageData(noiseImg, 0, 0);
+    c.save(); c.globalAlpha = alpha; c.imageSmoothingEnabled = false; c.drawImage(noiseCv, 0, 0, W, H);
+    c.fillStyle = `rgba(0,0,0,${alpha * 0.3})`;
+    for (let y = 0; y < H; y += 4) c.fillRect(0, y, W, 2);
+    c.restore();
+  }
 
   const gifList = () => ($('trollGifs').value || '').split(/\s+/).filter((u) => /^https:\/\/\S+$/i.test(u));
 
@@ -1004,17 +1112,17 @@ const TROLL = (() => {
     cancelAnimationFrame(raf);
     clearTimeout(endTimer);
     layer.classList.remove('on');
-    document.body.classList.remove('troll', 'quake');
+    document.body.classList.remove('troll');
     setTimeout(() => { if (!active) { layer.classList.remove('gif'); $('trollGif').removeAttribute('src'); } }, 700);
   }
 
-  function launch(by) {
+  function launch(by, forced) {
     if (active || REDUCED || chatMode) return;
     active = true;
     schedule();
     const gifs = gifList();
     const keys = Object.keys(SCENES);
-    const useGif = gifs.length && Math.random() < 0.5;
+    const useGif = !forced && gifs.length && Math.random() < 0.5;
     let label;
     if (useGif) {
       layer.classList.add('gif');
@@ -1023,11 +1131,21 @@ const TROLL = (() => {
     } else {
       layer.classList.remove('gif');
       resize();
-      const key = keys[Math.floor(Math.random() * keys.length)];
+      // pas deux fois la même scène d'affilée
+      const pool = keys.filter((k) => k !== lastScene);
+      const key = SCENES[forced] ? forced : pool[Math.floor(Math.random() * pool.length)];
+      lastScene = key;
       const draw = SCENES[key].make();
       label = SCENES[key].name;
       const t0 = performance.now();
-      const frame = (now) => { if (!active) return; draw(now - t0); raf = requestAnimationFrame(frame); };
+      const frame = (now) => {
+        if (!active) return;
+        const el = now - t0;
+        draw(el);
+        if (el < 450) drawStatic(1 - el / 450);
+        else if (el > TROLL_MS - 450) drawStatic(Math.min(1, (el - (TROLL_MS - 450)) / 450));
+        raf = requestAnimationFrame(frame);
+      };
       raf = requestAnimationFrame(frame);
     }
     $('trollTag').textContent = by ? `${label} · lancé par ${by}` : label;
@@ -1043,7 +1161,7 @@ const TROLL = (() => {
   function maybe() {
     if (session && !active && $('trollMode').checked && Date.now() > nextAt) launch();
   }
-  return { launch, maybe, stop, get active() { return active; } };
+  return { launch, maybe, stop, scenes: () => Object.keys(SCENES), get active() { return active; } };
 })();
 
 const fmt = (ms) => {
