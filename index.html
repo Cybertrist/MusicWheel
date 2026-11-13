@@ -2,235 +2,32 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0c0c10">
-  <title>Music Wheel</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
-  <script>
-    (() => {
-      const q = new URLSearchParams(location.search), cl = document.documentElement.classList;
-      if (q.has('chat') || q.has('admin')) cl.add('chat-mode');
-      if (q.has('admin')) cl.add('admin-mode');
-    })();
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music Wheel - Hors ligne</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid; place-items: center; padding: 24px;
+      background: radial-gradient(circle at 30% 20%, #2a1450 0%, transparent 55%),
+                  radial-gradient(circle at 75% 80%, #0f3a2a 0%, transparent 55%), #0b0b10;
+      color: #f2f2f5; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      text-align: center;
+    }
+    .box { max-width: 560px; padding: 40px 32px; border-radius: 24px;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); }
+    h1 { margin: 0 0 14px; font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: 1.1; }
+    p { margin: 0; color: #b9b9c6; font-size: 1.1rem; line-height: 1.5; }
+    p + p { margin-top: 12px; }
+    strong { color: #fff; }
+  </style>
 </head>
 <body>
-  <!-- Icônes (sprite SVG) -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <symbol id="i-wheel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 3v7M12 14v7M3 12h7M14 12h7M5.6 5.6l5 5M13.4 13.4l5 5M18.4 5.6l-5 5M10.6 13.4l-5 5"/></symbol>
-      <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
-      <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></symbol>
-      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
-      <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
-      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
-      <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10 14M21 3l-6.5 18-4-7.5L3 9.5z"/></symbol>
-      <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M19 5 9 12l10 7z" class="fill"/></symbol>
-      <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14"/><path d="M5 5l10 7-10 7z" class="fill"/></symbol>
-      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" class="fill"/></symbol>
-      <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" class="fill"/><rect x="14" y="5" width="4" height="14" rx="1" class="fill"/></symbol>
-      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" class="fill"/></symbol>
-      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
-      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7L20 8.7"/><path d="M20 3.5v5.2h-5.2"/></symbol>
-      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></symbol>
-    </defs>
-  </svg>
-
-  <!-- Fond animé -->
-  <div class="bg" aria-hidden="true">
-    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="blob b4"></span>
-    <canvas id="bgfx"></canvas>
-    <span class="grid"></span><span class="grain"></span>
+  <div class="box">
+    <h1>Music Wheel est hors ligne</h1>
+    <p>Le site est temporairement désactivé.</p>
+    <p>Demande à <strong>Tristan</strong> de le remettre en ligne.</p>
   </div>
-
-  <!-- Fonds troll (scènes animées ou GIF) -->
-  <div id="troll" aria-hidden="true">
-    <canvas id="trollCv"></canvas>
-    <img id="trollGif" alt="">
-  </div>
-  <div id="trollTag"></div>
-  <div id="trollInfo"></div>
-
-  <!-- Révélation du genre + compte à rebours -->
-  <div id="reveal" aria-live="polite">
-    <div class="rays"></div>
-    <div class="rv-inner"><small>La roue a choisi</small><strong id="revealName"></strong></div>
-  </div>
-  <div id="countdown" aria-hidden="true"></div>
-
-  <canvas id="fx" aria-hidden="true"></canvas>
-  <div id="boom" aria-live="polite"><span>Temps écoulé !</span><small>Nouveau genre dans un instant…</small></div>
-  <div id="toast" role="status"></div>
-  <div id="bubbles" aria-live="polite"></div>
-
-  <!-- ============ Vue principale (écran / TV) ============ -->
-  <div class="host">
-    <header>
-      <h1><svg class="i logo"><use href="#i-wheel"/></svg> Music <em>Wheel</em></h1>
-      <span class="onair" id="onAir">En direct</span>
-      <div id="auth">
-        <span id="authStatus" class="status">Non connecté à Spotify</span>
-        <button id="loginBtn">Se connecter à Spotify</button>
-        <button id="logoutBtn" class="ghost" hidden>Déconnexion</button>
-      </div>
-    </header>
-
-    <main>
-      <div class="left-col">
-        <section class="lyrics-panel card">
-          <h2><svg class="i"><use href="#i-mic"/></svg> Paroles</h2>
-          <div class="lyrics-track" id="lyricsTrack"></div>
-          <div class="lyrics" id="lyrics">
-            <p class="lyrics-empty">Les paroles du morceau en cours s'afficheront ici.</p>
-          </div>
-        </section>
-
-        <!-- QR code bien visible -->
-        <a id="qrDock" class="qr-card card" target="_blank" title="Ouvrir le chat">
-          <div class="qr" id="qrLink"></div>
-          <div class="qr-text">
-            <strong>Écris sur l'écran !</strong>
-            <span>Scanne, choisis un pseudo, envoie. Tape <b>!troll</b> pour un fond troll.</span>
-          </div>
-        </a>
-      </div>
-
-      <section class="wheel-zone">
-        <div class="wheel-wrap">
-          <canvas id="viz"></canvas>
-          <div class="pointer" id="pointer"></div>
-          <canvas id="wheel"></canvas>
-        </div>
-        <button id="spinBtn" class="big">Tourner la roue</button>
-        <div class="kbd-hint">ou appuie sur <kbd>Espace</kbd></div>
-        <div id="result" hidden>
-          <div class="genre-label">Genre tiré</div>
-          <div class="genre-name" id="resultGenre"></div>
-          <div class="timer" id="timer">15:00</div>
-          <div class="progress"><div id="progressBar"></div></div>
-          <div class="playlist" id="playlistInfo"></div>
-          <div class="now" id="nowPlaying"></div>
-          <div class="controls">
-            <button id="prevBtn" class="ghost round" title="Précédent"><svg class="i"><use href="#i-prev"/></svg></button>
-            <button id="pauseBtn" class="round play" title="Lecture / pause">
-              <svg class="i when-paused"><use href="#i-play"/></svg><svg class="i when-playing"><use href="#i-pause"/></svg>
-            </button>
-            <button id="nextBtn" class="ghost round" title="Suivant"><svg class="i"><use href="#i-next"/></svg></button>
-            <button id="stopBtn" class="ghost danger"><svg class="i"><use href="#i-stop"/></svg> Arrêter</button>
-          </div>
-        </div>
-        <div id="message"></div>
-      </section>
-
-      <aside class="side">
-        <div class="card">
-          <div class="card-head">
-            <h2><svg class="i"><use href="#i-list"/></svg> Genres</h2>
-            <span class="badge" id="genreCount"></span>
-          </div>
-          <form id="addForm" class="add">
-            <input id="genreInput" placeholder="Ajouter un genre (ex : Jazz)" autocomplete="off">
-            <button type="submit" class="icon-btn" title="Ajouter"><svg class="i"><use href="#i-plus"/></svg></button>
-          </form>
-          <ul id="genreList"></ul>
-          <div class="row">
-            <button id="resetPlayed" class="ghost small" hidden>Remettre les genres joués</button>
-            <button id="resetGenres" class="ghost small">Genres par défaut</button>
-          </div>
-        </div>
-
-        <details class="card fold" id="settingsFold">
-          <summary><h2><svg class="i"><use href="#i-sliders"/></svg> Réglages</h2><svg class="i chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary>
-          <div class="fold-body">
-          <div class="field">
-            <span class="field-label"><svg class="i"><use href="#i-speaker"/></svg> Appareil de lecture</span>
-            <div class="device-row">
-              <select id="deviceSelect"><option value="">Connecte-toi d'abord</option></select>
-              <button id="refreshDevices" class="icon-btn ghost" title="Rafraîchir les appareils"><svg class="i"><use href="#i-refresh"/></svg></button>
-            </div>
-          </div>
-          <div class="field">
-            <span class="field-label">Durée d'une session</span>
-            <div class="duration">
-              <div class="presets" id="presets">
-                <button type="button" data-min="5">5</button>
-                <button type="button" data-min="10">10</button>
-                <button type="button" data-min="15">15</button>
-                <button type="button" data-min="30">30</button>
-              </div>
-              <div class="custom"><input id="duration" type="number" min="1" max="180" value="15"><span>min</span></div>
-            </div>
-          </div>
-          <label class="switch">
-            <input id="autoSpin" type="checkbox" checked><span class="slider"></span>
-            <span>Relancer la roue automatiquement</span>
-          </label>
-          <label class="switch">
-            <input id="removePlayed" type="checkbox" checked><span class="slider"></span>
-            <span>Retirer le genre de la roue une fois joué</span>
-          </label>
-          <label class="switch">
-            <input id="sfx" type="checkbox" checked><span class="slider"></span>
-            <span>Effets sonores</span>
-          </label>
-          <label class="switch">
-            <input id="showChat" type="checkbox" checked><span class="slider"></span>
-            <span>Afficher le chat à l'écran</span>
-          </label>
-          <label class="switch">
-            <input id="trollMode" type="checkbox" checked><span class="slider"></span>
-            <span>Fonds troll de temps en temps</span>
-          </label>
-          <div class="field troll-field">
-            <span class="field-label">Tes GIFs troll (un lien par ligne, optionnel)</span>
-            <textarea id="trollGifs" rows="3" spellcheck="false" placeholder="https://media.giphy.com/media/…/giphy.gif"></textarea>
-          </div>
-          <div class="row settings-actions">
-            <button id="trollBtn" class="ghost small" type="button">Lancer un troll maintenant</button>
-            <a class="ghost-link" href="?admin" target="_blank">Modérer le chat</a>
-          </div>
-          </div>
-        </details>
-      </aside>
-    </main>
-
-    <!-- Bandeau façon télé -->
-    <footer class="ticker">
-      <div class="ticker-tag"><span class="rec"></span>Chat live</div>
-      <div class="ticker-track"><div class="ticker-move" id="tickerMove"><span class="ticker-empty">Scanne le QR code et écris un message, il passera ici en direct.</span></div></div>
-    </footer>
-  </div>
-
-  <!-- ============ Vue téléphone (?chat) ============ -->
-  <div class="phone">
-    <header class="phone-head">
-      <h1><svg class="i logo"><use href="#i-wheel"/></svg> Music <em>Wheel</em></h1>
-      <span class="onair on only-chat">Chat live</span>
-      <span class="onair only-admin">Modération</span>
-    </header>
-    <div class="admin-bar only-admin">
-      <p>Clique sur la croix d'un message pour le retirer de tous les écrans, ou vide tout le chat d'un coup.</p>
-      <button id="clearChat" class="danger-btn" type="button"><svg class="i"><use href="#i-x"/></svg> Vider tout le chat</button>
-    </div>
-    <div class="chat-log" id="chatLog">
-      <p class="lyrics-empty">Les messages envoyés ici s'affichent en direct sur l'écran. Écris <b>!troll</b> pour lancer un fond troll.</p>
-    </div>
-    <form class="chat-form phone-form" id="chatFormPhone" autocomplete="off">
-      <input name="nick" maxlength="20" placeholder="Ton pseudo">
-      <div class="chat-input">
-        <input name="msg" maxlength="140" placeholder="Écris ton message…">
-        <button type="submit" class="icon-btn" title="Envoyer"><svg class="i"><use href="#i-send"/></svg></button>
-      </div>
-    </form>
-  </div>
-
-  <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js?v=19"></script>
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
