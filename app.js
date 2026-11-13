@@ -2,6 +2,9 @@
 //  Music Wheel — roue des genres + lecture Spotify pendant X minutes
 // =====================================================================
 
+// Client ID public de l'app Spotify (pas un secret : le flux PKCE n'utilise jamais le client secret)
+const DEFAULT_CLIENT_ID = '73a86de39f33467bade29e5bc7e0d32d';
+
 const SCOPES = [
   'streaming',
   'user-read-email',
@@ -523,7 +526,8 @@ function saveGenres() { store.set('mw_genres_v2', genres); renderGenres(); }
 // ---------------------------------------------------------------------
 function bindUI() {
   $('redirectHint').textContent = REDIRECT_URI;
-  $('clientId').value = store.get('mw_client_id', '');
+  $('clientId').value = store.get('mw_client_id', '') || DEFAULT_CLIENT_ID;
+  store.set('mw_client_id', $('clientId').value);
   $('clientId').onchange = (e) => store.set('mw_client_id', e.target.value.trim());
   $('duration').value = store.get('mw_duration', 15);
   $('duration').onchange = (e) => store.set('mw_duration', Number(e.target.value) || 15);
