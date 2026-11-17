@@ -505,10 +505,11 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 /* Fonds troll */
 #troll { position: fixed; inset: 0; z-index: 50; opacity: 0; visibility: hidden; transition: opacity .45s, visibility .45s; background: #000; cursor: pointer; }
 #troll.on { opacity: 1; visibility: visible; }
-#trollCv, #trollGif { position: absolute; inset: 0; width: 100%; height: 100%; }
-#trollGif { object-fit: cover; display: none; }
+#trollCv, #trollGif, #trollVid { position: absolute; inset: 0; width: 100%; height: 100%; }
+#trollGif, #trollVid { object-fit: contain; display: none; }
 #troll.gif #trollGif { display: block; }
-#troll.gif #trollCv { display: none; }
+#troll.gif #trollCv, #troll.vid #trollCv { display: none; }
+#troll.vid #trollVid { display: block; }
 #trollTag {
   position: fixed; bottom: calc(var(--ticker-h) + 20px); left: 50%; z-index: 70; transform: translate(-50%, 30px) rotate(-2deg); opacity: 0; pointer-events: none;
   padding: 8px 20px; border-radius: 10px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 1.1rem; letter-spacing: .08em; text-transform: uppercase;

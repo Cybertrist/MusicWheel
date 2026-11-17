@@ -1105,31 +1105,102 @@ const TROLL = (() => {
     c.restore();
   }
 
-  const gifList = () => ($('trollGifs').value || '').split(/\s+/).filter((u) => /^https:\/\/\S+$/i.test(u));
+  // GIFs et vidéos intégrés, toujours dans la rotation
+  const BUILTIN_MEDIA = [
+    'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ2dma29zZDJqMmdpbmZzamY0amRxaW9zMDVzNWMyOXQ5cnV0eWV6ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/IbyeZFy0dn18w7vOkQ/giphy.gif',
+    'https://media.tenor.com/sgPmb_mSSDIAAAAd/mao.gif',
+    'https://i.pinimg.com/originals/d2/8b/d1/d28bd1ba2611273859eb46a4ab0a7eb9.gif',
+    'https://video.twimg.com/amplify_video/2122529854662844416/vid/avc1/738x720/vdpOdAEWErHVDchS.mp4?tag=29',
+  ];
+  // GIFs par genre musical (clé = nom du genre sans accents ni ponctuation)
+  const GENRE_GIFS = {
+    grunge: ['HjCfvm3QCsNHi', 'rWNYw8eu0UKKA', 'H3aIMcl0h8ZNu', 'qVUJyltHY7ofm'],
+    punk: ['WzYQchhfeyKU8', 'knVoURKqAcPYc', 'WQwG2qAQVZXo6DLGoi', '5x4nFtQE0xHQh0hJpX'],
+    techno: ['3W0vjXgLj4rg4', 'PvKlwYTiKATRe', 'kegHnC7EtTjZhHF0q6', 'siR2RCqe40J6C8b9i8'],
+    house: ['H4bnElMGhA3ReTdUZQ', '59kd3moSF6BZCVE7vR', 'wcfQ8BPg1QK1aEut8a', 'keY09m6h7tTWYJu543'],
+    rap: ['UomtITuXq8kvK', 'TrB29ApJbsFkk', 'gdLbAph67guzu', 'dJp2CZKGEMok8'],
+    kpop: ['BKGPacJI20BuXegAfI', 'kadlwCyHIQSRTHmpKb', 'iEvG9zsL6jFbF3EJe7', 'EFutXeti7sZSUev4se'],
+    hiphop: ['kgKrO1A3JbWTK', 'VNxwybK7VrJmzz4ZEI', 'puhNr9gHyiQPC', 'bKd6hvf8BSTdu'],
+    rnb: ['E7xVFdN9824Vi', 'tsQCJ1cJ1C8Sc', 'Smho4ID8HCz0Q', 'Y2niyPHGzjhy58yzwu'],
+    rb: null,  // « R&B » sans le n
+  };
+  GENRE_GIFS.rb = GENRE_GIFS.rnb;
+  for (const g in GENRE_GIFS) GENRE_GIFS[g] = GENRE_GIFS[g].map((id) => `https://media.giphy.com/media/${id}/giphy.gif`);
+  const genreGifsFor = (entry) => {
+    if (!entry) return [];
+    const k = parseGenre(entry).label.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+    if (GENRE_GIFS[k]) return GENRE_GIFS[k];
+    const hit = Object.keys(GENRE_GIFS).find((g) => k.includes(g));
+    return hit ? GENRE_GIFS[hit] : [];
+  };
+  const isVideo = (u) => /\.(mp4|webm|mov)(\?|$)/i.test(u);
+  const mediaList = () => [...BUILTIN_MEDIA, ...($('trollGifs').value || '').split(/\s+/).filter((u) => /^https:\/\/\S+$/i.test(u))];
 
+  // Vidéos chargées une fois en mémoire (sans Referer : X refuse sinon)
+  const blobs = new Map();
+  const loadVideo = (u) => {
+    if (!blobs.has(u)) {
+      blobs.set(u, fetch(u, { referrerPolicy: 'no-referrer' })
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); })
+        .then((b) => URL.createObjectURL(b))
+        .catch(() => { blobs.delete(u); return null; }));
+    }
+    return blobs.get(u);
+  };
+  // Préchargement des GIFs/vidéos pour un affichage immédiat
+  setTimeout(() => {
+    if (chatMode) return;
+    for (const u of BUILTIN_MEDIA) { if (isVideo(u)) loadVideo(u); else new Image().src = u; }
+  }, 4000);
+
+  const vid = $('trollVid');
   function stop() {
     active = false;
     cancelAnimationFrame(raf);
     clearTimeout(endTimer);
     layer.classList.remove('on');
     document.body.classList.remove('troll');
-    setTimeout(() => { if (!active) { layer.classList.remove('gif'); $('trollGif').removeAttribute('src'); } }, 700);
+    vid.pause();
+    setTimeout(() => {
+      if (!active) { layer.classList.remove('gif', 'vid'); $('trollGif').removeAttribute('src'); vid.removeAttribute('src'); vid.load(); }
+    }, 700);
   }
 
+  let lastMedia = '', useMediaNext = true;
   function launch(by, forced) {
     if (active || REDUCED || chatMode) return;
     active = true;
     schedule();
-    const gifs = gifList();
+    const media = mediaList();
     const keys = Object.keys(SCENES);
-    const useGif = !forced && gifs.length && Math.random() < 0.5;
+    // alterne GIF/vidéo et scène animée, avec un peu de hasard
+    const useMedia = !forced && media.length && (useMediaNext || Math.random() < 0.3);
+    useMediaNext = !useMedia;
     let label;
-    if (useGif) {
-      layer.classList.add('gif');
-      $('trollGif').src = gifs[Math.floor(Math.random() * gifs.length)];
-      label = 'Pause troll';
+    if (useMedia) {
+      // une fois sur deux, un GIF lié au genre en cours d'écoute
+      const genreGifs = genreGifsFor(session?.genre);
+      const fromGenre = genreGifs.length && Math.random() < 0.5;
+      const list = fromGenre ? genreGifs : media;
+      const pool = list.length > 1 ? list.filter((u) => u !== lastMedia) : list;
+      const url = pool[Math.floor(Math.random() * pool.length)];
+      lastMedia = url;
+      label = fromGenre ? `Ambiance ${parseGenre(session.genre).label}` : 'Pause troll';
+      if (isVideo(url)) {
+        layer.classList.remove('gif');
+        layer.classList.add('vid');
+        loadVideo(url).then((src) => {
+          if (!active) return;
+          if (!src) { stop(); return; }
+          vid.src = src; vid.currentTime = 0; vid.play().catch(() => {});
+        });
+      } else {
+        layer.classList.remove('vid');
+        layer.classList.add('gif');
+        $('trollGif').src = url;
+      }
     } else {
-      layer.classList.remove('gif');
+      layer.classList.remove('gif', 'vid');
       resize();
       // pas deux fois la même scène d'affilée
       const pool = keys.filter((k) => k !== lastScene);
@@ -1155,8 +1226,8 @@ const TROLL = (() => {
     endTimer = setTimeout(stop, TROLL_MS);
   }
 
-  // Prochain troll automatique dans 3 à 7 minutes
-  function schedule() { nextAt = Date.now() + (180 + Math.random() * 240) * 1000; }
+  // Prochaine animation automatique toutes les minutes environ
+  function schedule() { nextAt = Date.now() + (55 + Math.random() * 15) * 1000; }
   schedule();
   function maybe() {
     if (session && !active && $('trollMode').checked && Date.now() > nextAt) launch();

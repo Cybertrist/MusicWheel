@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
   <script>
     (() => {
       const q = new URLSearchParams(location.search), cl = document.documentElement.classList;
@@ -51,6 +51,7 @@
   <div id="troll" aria-hidden="true">
     <canvas id="trollCv"></canvas>
     <img id="trollGif" alt="">
+    <video id="trollVid" muted loop playsinline preload="none"></video>
   </div>
   <div id="trollTag"></div>
   <div id="trollInfo"></div>
@@ -183,10 +184,10 @@
           </label>
           <label class="switch">
             <input id="trollMode" type="checkbox" checked><span class="slider"></span>
-            <span>Fonds troll de temps en temps</span>
+            <span>Animation troll toutes les minutes</span>
           </label>
           <div class="field troll-field">
-            <span class="field-label">Tes GIFs troll (un lien par ligne, optionnel)</span>
+            <span class="field-label">GIFs / vidéos troll en plus (un lien par ligne, optionnel)</span>
             <textarea id="trollGifs" rows="3" spellcheck="false" placeholder="https://media.giphy.com/media/…/giphy.gif"></textarea>
           </div>
           <div class="row settings-actions">
@@ -230,7 +231,7 @@
 
   <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
