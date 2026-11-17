@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
   <script>
     (() => {
       const q = new URLSearchParams(location.search), cl = document.documentElement.classList;
@@ -95,7 +95,7 @@
           <div class="qr" id="qrLink"></div>
           <div class="qr-text">
             <strong>Écris sur l'écran !</strong>
-            <span>Scanne, choisis un pseudo, envoie. Tape <b>!troll</b> pour un fond troll.</span>
+            <span>Scanne, choisis un pseudo, envoie. Tape <b>!gif</b> pour lancer une pause GIF.</span>
           </div>
         </a>
       </div>
@@ -184,14 +184,14 @@
           </label>
           <label class="switch">
             <input id="trollMode" type="checkbox" checked><span class="slider"></span>
-            <span>Animation troll toutes les minutes</span>
+            <span>Pause GIF toutes les minutes</span>
           </label>
           <div class="field troll-field">
-            <span class="field-label">GIFs / vidéos troll en plus (un lien par ligne, optionnel)</span>
+            <span class="field-label">GIFs / vidéos en plus (un lien par ligne, optionnel)</span>
             <textarea id="trollGifs" rows="3" spellcheck="false" placeholder="https://media.giphy.com/media/…/giphy.gif"></textarea>
           </div>
           <div class="row settings-actions">
-            <button id="trollBtn" class="ghost small" type="button">Lancer un troll maintenant</button>
+            <button id="trollBtn" class="ghost small" type="button">Lancer une pause GIF</button>
             <a class="ghost-link" href="?admin" target="_blank">Modérer le chat</a>
           </div>
           </div>
@@ -218,7 +218,7 @@
       <button id="clearChat" class="danger-btn" type="button"><svg class="i"><use href="#i-x"/></svg> Vider tout le chat</button>
     </div>
     <div class="chat-log" id="chatLog">
-      <p class="lyrics-empty">Les messages envoyés ici s'affichent en direct sur l'écran. Écris <b>!troll</b> pour lancer un fond troll.</p>
+      <p class="lyrics-empty">Les messages envoyés ici s'affichent en direct sur l'écran. Écris <b>!gif</b> pour lancer une pause GIF.</p>
     </div>
     <form class="chat-form phone-form" id="chatFormPhone" autocomplete="off">
       <input name="nick" maxlength="20" placeholder="Ton pseudo">
@@ -231,7 +231,7 @@
 
   <!-- app.js d'abord : il définit window.onSpotifyWebPlaybackSDKReady que le SDK appelle -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
 </body>
 </html>
