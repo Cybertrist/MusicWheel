@@ -1755,7 +1755,7 @@ function onChatMessage(msg, live) {
     log.scrollTop = log.scrollHeight;
     return;
   }
-  if (live && /^!troll\b/i.test(msg.m) && Date.now() - lastChatTroll > 45_000) {
+  if (live && /^!(gif|troll)\b/i.test(msg.m) && Date.now() - lastChatTroll > 45_000) {
     lastChatTroll = Date.now();
     TROLL.launch(msg.n);
   }
