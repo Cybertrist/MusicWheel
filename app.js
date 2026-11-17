@@ -1185,7 +1185,7 @@ const TROLL = (() => {
       const pool = list.length > 1 ? list.filter((u) => u !== lastMedia) : list;
       const url = pool[Math.floor(Math.random() * pool.length)];
       lastMedia = url;
-      label = fromGenre ? `Ambiance ${parseGenre(session.genre).label}` : 'Pause troll';
+      label = fromGenre ? `Ambiance ${parseGenre(session.genre).label}` : 'Pause GIF';
       if (isVideo(url)) {
         layer.classList.remove('gif');
         layer.classList.add('vid');
